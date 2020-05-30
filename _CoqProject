@@ -1,2 +1,3 @@
--R ../temppro temppro
-dummy.v
+-R ../tsca-formaldev tscaformaldev
+./util.v
+./test4.v
