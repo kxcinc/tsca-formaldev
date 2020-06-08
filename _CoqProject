@@ -1,3 +1,4 @@
 -R ../tsca-formaldev tscaformaldev
 ./util.v
-./test4.v
+./fundme.v
+./testout.v
