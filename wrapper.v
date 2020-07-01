@@ -8,9 +8,8 @@ Unset Printing Implicit Defensive.
 
 Definition parameter_ty := Comparable_type bytes.
 Definition storage_ty :=
-  (pair
-     (lambda (pair bytes bytes) (pair (list operation) bytes)) (* wfunc *)
-     (pair bytes (* wstorage *)
+  (pair bytes (* wstorage *)
+     (pair (lambda (pair bytes bytes) (pair (list operation) bytes)) (* wfunc *)
            (option (pair address (pair string string))))).
 Module wrapper(C : ContractContext).
 Module semantics := Semantics C. Import semantics.
@@ -20,15 +19,11 @@ Open Scope string_scope.
 Definition wrapper : full_contract false parameter_ty None storage_ty :=
 {
   UNPAIR;
-  DIP1 {DUP; CDAR};
+  DIP1 { UNPAIR; DIP1 { DUP; CAR } };
   PAIR;
-  DIP1 {DUP; CAR};
   EXEC;
   UNPAIR;
-  DIIP {UNPAIR};
-  DIIIP {UNPAIR; DROP1};
-  DIIP {SWAP};
-  DIP1 {PAIR; SWAP; PAIR};
+  DIP1 { PAIR };
   PAIR
 }.
 
@@ -41,11 +36,8 @@ Local Definition exec
 {
   UNPAIR;
   LAMBDA (pair bytes bytes) (pair (list operation) bytes) A;
-  SWAP;
-  EXEC;
-  UNPAIR;
-  DIP1 {PAIR; PUSH _ (Instruction false A); PAIR};
-  PAIR
+  SWAP; EXEC; UNPAIR;
+  DIP1 { DIP1 {PUSH _ (Instruction false A); PAIR}; PAIR }; PAIR
 }.
 Import Notations.
 
@@ -65,9 +57,10 @@ fuel returned_operations new_storage :
   eval_seq (no_self env) A fuel (arg, wstore, tt) = Return (returned_operations, new_storage, tt) ->
   eval_seq env (exec A) fuel.+1 (arg, wstore, avt_id, tt) =
   Return (returned_operations,
-          ((existT _ false A : data (lambda (pair bytes bytes)
+          (new_storage,
+           ((existT _ false A : data (lambda (pair bytes bytes)
                                             (pair (list operation) bytes))),
-           (new_storage, avt_id)), tt).
+            avt_id)), tt).
 Proof.
   move=> Hfuel.
   have<-: 3 + (fuel - 3) = fuel by rewrite addnC subnK.
@@ -98,24 +91,24 @@ Lemma wrapper_correct_success
 (env : @proto_env (Some (parameter_ty, None)))
 (A : instruction_seq None false (pair bytes bytes ::: [::])
                  (pair (list operation) bytes ::: [::]))
-(fuel : Datatypes.nat) returned_operations new_storage :
+fuel returned_operations new_storage :
   3 <= fuel ->
   eval_seq (no_self env) A fuel (arg, wstore, tt) = Return (returned_operations, new_storage, tt) ->
-  eval_seq env wrapper fuel.+1 (arg, ((existT _ false A : data (lambda (pair bytes bytes)
-                                         (pair (list operation) bytes))), (wstore, avt_id)), tt)
+  eval_seq env wrapper fuel.+1 (arg, (wstore, ((existT _ false A : data (lambda (pair bytes bytes)
+                                         (pair (list operation) bytes))), avt_id)), tt)
 = Return (returned_operations,
-          ((existT _ false A : data (lambda (pair bytes bytes)
-                                            (pair (list operation) bytes))),
-           (new_storage, avt_id)), tt).
+          (new_storage,
+           ((existT _ false A : data (lambda (pair bytes bytes)
+                                            (pair (list operation) bytes))), avt_id)), tt).
 Proof.
   rewrite !return_precond !eval_seq_precond_correct => Hfuel.
   have<-: 3 + (fuel - 3) = fuel by rewrite addnC subnK.
   move: (eval_seq_precond_eqv _ (no_self env) false _ _ A (3 + (fuel - 3)) (arg, wstore, tt)
-  (fun '(y, tt) =>
+     (fun '(y, tt) =>
      let (x, _) := y in
      let (_, y1) := y in
-     (x, (existT (fun tff : Datatypes.bool => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, (y1, avt_id)), tt) =
-     (returned_operations, (existT (fun tff : Datatypes.bool => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, (new_storage, avt_id)), tt))
+     (x, (y1, (existT (fun tff : Datatypes.bool => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, avt_id)), tt) =
+     (returned_operations, (new_storage, (existT (fun tff : Datatypes.bool => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, avt_id)), tt))
     (eq^~ (returned_operations, new_storage, tt))).
   rewrite /eval_seq_precond /= => H H0.
   rewrite H; first by apply H0.
@@ -133,8 +126,7 @@ Lemma wrapper_correct_fail
 (fuel : Datatypes.nat) e :
   3 <= fuel ->
   eval_seq (no_self env) A fuel (arg, wstore, tt) = Failed _ e ->
-  eval_seq env wrapper fuel.+1 (arg, ((existT _ false A : data (lambda (pair bytes bytes)
-                                         (pair (list operation) bytes))), (wstore, avt_id)), tt)
+  eval_seq env wrapper fuel.+1 (arg, (wstore, ((existT _ false A : data (lambda (pair bytes bytes) (pair (list operation) bytes))), avt_id)), tt)
 = Failed _ e.
 Proof.
   move=> Hfuel.
@@ -151,8 +143,8 @@ Lemma wrapper_correct
                  (pair (list operation) bytes ::: [::]))
 fuel :
   4 <= fuel ->
-  eval_seq env wrapper fuel (arg, ((existT _ false A : data (lambda (pair bytes bytes)
-                                   (pair (list operation) bytes))), (wstore, avt_id)), tt)
+  eval_seq env wrapper fuel (arg, (wstore, ((existT _ false A : data (lambda (pair bytes bytes)
+                                   (pair (list operation) bytes))), avt_id)), tt)
 = eval_seq env (exec A) fuel (arg, wstore, avt_id, tt).
 Proof.
   case: fuel => // fuel Hfuel.
