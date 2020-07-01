@@ -107,6 +107,7 @@ Lemma wrapper_correct_success
           ((existT _ false A : data (lambda (pair bytes bytes)
                                             (pair (list operation) bytes))),
            (new_storage, avt_id)), tt).
+Proof.
   rewrite !return_precond !eval_seq_precond_correct => Hfuel.
   have<-: 3 + (fuel - 3) = fuel by rewrite addnC subnK.
   move: (eval_seq_precond_eqv _ (no_self env) false _ _ A (3 + (fuel - 3)) (arg, wstore, tt)
@@ -148,15 +149,15 @@ Lemma wrapper_correct
 (env : @proto_env (Some (parameter_ty, None)))
 (A : instruction_seq None false (pair bytes bytes ::: [::])
                  (pair (list operation) bytes ::: [::]))
-(fuel : Datatypes.nat) :
-  3 <= fuel ->
-  eval_seq env wrapper fuel.+1 (arg, ((existT _ false A : data (lambda (pair bytes bytes)
+fuel :
+  4 <= fuel ->
+  eval_seq env wrapper fuel (arg, ((existT _ false A : data (lambda (pair bytes bytes)
                                    (pair (list operation) bytes))), (wstore, avt_id)), tt)
-= eval_seq env (exec A) fuel.+1 (arg, wstore, avt_id, tt).
+= eval_seq env (exec A) fuel (arg, wstore, avt_id, tt).
 Proof.
-  move=> Hfuel.
+  case: fuel => // fuel Hfuel.
   case HA: (eval_seq (no_self env) A fuel (arg, wstore, tt)) => [e|[][]a b []].
    by rewrite (@wrapper_correct_fail _ _ _ _ _ _ e) // (@exec_correct_fail _ _ _ _ _ _ e) //.
-   by rewrite (@wrapper_correct_success _ _ _ _ _ _ a b) // (@exec_correct_success _ _ _ _ _ _ a b).
+  by rewrite (@wrapper_correct_success _ _ _ _ _ _ a b) // (@exec_correct_success _ _ _ _ _ _ a b).
 Qed.
 End wrapper.
