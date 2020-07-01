@@ -18,9 +18,8 @@ Require Import String.
 Open Scope string_scope.
 
 Definition wrapper : full_contract false parameter_ty None storage_ty :=
-{DUP; CDR; DIP1 {CAR}};;;
 {
-  SWAP;
+  UNPAIR;
   DIP1 {DUP; CDR; CAR};
   PAIR;
   DIP1 {DUP; CAR};
