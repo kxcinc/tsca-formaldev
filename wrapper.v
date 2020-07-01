@@ -17,15 +17,14 @@ Require Import String.
 Open Scope string_scope.
 
 Definition wrapper : full_contract false parameter_ty None storage_ty :=
-{
-  UNPAIR;
-  DIP1 { UNPAIR; DIP1 { DUP; CAR } };
-  PAIR;
-  EXEC;
-  UNPAIR;
-  DIP1 { PAIR };
-  PAIR
-}.
+  {
+    DUP; CAR;
+    DIP1 { CDR; DUP ; CAR ; DIP1 { CDR; DUP; CAR }};
+    PAIR;
+    EXEC;
+    DUP ; CAR ; DIP1 { CDR; PAIR };
+    PAIR
+  }.
 
 Local Definition exec
 (A : instruction_seq None false (pair bytes bytes ::: [::])
