@@ -18,11 +18,8 @@ Open Scope string_scope.
 
 Definition wrapper : full_contract false parameter_ty None storage_ty :=
   {
-    DUP; CAR;
-    DIP1 { CDR; DUP ; CAR ; DIP1 { CDR; DUP; CAR }};
-    PAIR;
-    EXEC;
-    DUP ; CAR ; DIP1 { CDR; PAIR };
+    DUP; CDR; CDR; CAR; DUUP; CDAR; DUUUP; CAR; PAIR; EXEC;
+    DUP; CAR; DIP1 { CDR; DIP1 { CDDR }; PAIR };
     PAIR
   }.
 
