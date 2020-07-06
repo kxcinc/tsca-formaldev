@@ -12,15 +12,15 @@ Variable RcLabel : eqType.
 Variable AcLabel : eqType.
 Variable MichelsonValue : Type.
 Variable MichelsonType : Type.
-Variable TokenMeasure : ringType.
-(* erased TokenUpdate *)
+Definition TokenMeasure := nat.
+Definition TokenUpdate := int.
 Variable ContractAddress : Type.
 Definition Address := sum (Equality.sort RcLabel) (Equality.sort AcLabel).
 Definition ProgramType := prod MichelsonType MichelsonType.
 Variable rctype : RcLabel -> ProgramType.
 Variable progtype : Program -> ProgramType.
 Definition Delegation := option AcLabel.
-Open Scope ring_scope.
+Import intZmod.
 
 Inductive effOp : Type :=
   | Transfer : forall (sender : Address) (destination : Address) (amount : TokenMeasure), effOp
@@ -38,7 +38,7 @@ Record RValue :=
 Record RelevantChainState :=
   {
     relevantContracts : RcLabel -> option RValue;
-    affectedContracts : AcLabel -> option TokenMeasure;
+    affectedContracts : AcLabel -> option TokenUpdate;
   }.
 
 Definition updateRCSr (x : RcLabel) (y : TokenMeasure) (G : RelevantChainState) :=
@@ -69,8 +69,8 @@ Definition updateRCSa (x : AcLabel) (y : TokenMeasure) (G : RelevantChainState) 
                            if X == x
                            then
                              match Y with
-                             | Some Y => Some (Y - y)
-                             | None => Some (-y)
+                             | Some Y => Some (addz Y (Negz y))
+                             | None => Some (Negz y)
                              end
                            else Y;
   |}.
