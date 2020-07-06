@@ -103,8 +103,8 @@ Proof.
      (fun '(y, tt) =>
      let (x, _) := y in
      let (_, y1) := y in
-     (x, (y1, (existT (fun tff : Datatypes.bool => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, avt_id)), tt) =
-     (returned_operations, (new_storage, (existT (fun tff : Datatypes.bool => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, avt_id)), tt))
+     (x, (y1, (existT _ false A, avt_id)), tt) =
+     (returned_operations, (new_storage, (existT (fun tff => instruction_seq None tff (pair (Comparable_type bytes) (Comparable_type bytes) ::: [::]) (pair (list operation) (Comparable_type bytes) ::: [::])) false A, avt_id)), tt))
     (eq^~ (returned_operations, new_storage, tt))).
   rewrite /eval_seq_precond /= => H H0.
   rewrite H; first by apply H0.
