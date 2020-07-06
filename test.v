@@ -35,16 +35,10 @@ Record RValue :=
     delegation : Delegation;
   }.
 
-Record LValue :=
-  {
-    type : option MichelsonType;
-    balupdate : TokenMeasure;
-  }.
-
 Record RelevantChainState :=
   {
     relevantContracts : RcLabel -> option RValue;
-    affectedContracts : AcLabel -> option LValue;
+    affectedContracts : AcLabel -> option TokenMeasure;
   }.
 
 Definition updateRCSr (x : RcLabel) (y : TokenMeasure) (G : RelevantChainState) :=
@@ -75,16 +69,8 @@ Definition updateRCSa (x : AcLabel) (y : TokenMeasure) (G : RelevantChainState) 
                            if X == x
                            then
                              match Y with
-                             | Some Y =>
-                               Some {|
-                                   type := type Y;
-                                   balupdate := balupdate Y - y;
-                               |}
-                             | None =>
-                               Some {|
-                                   type := None;
-                                   balupdate := - y;
-                               |}
+                             | Some Y => Some (Y - y)
+                             | None => Some (-y)
                              end
                            else Y;
   |}.
@@ -93,8 +79,6 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
   match eop with
   | Transfer (inl sendor) (inl dest) am =>
     updateRCSr dest am (updateRCSr sendor am G)
-  | Transfer (inr sendor) (inl dest) am =>
-    updateRCSr dest am (updateRCSa sendor am G)
   | Transfer (inr sendor) (inl dest) am =>
     updateRCSr dest am (updateRCSa sendor am G)
   | _ => G
