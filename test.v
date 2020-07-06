@@ -80,11 +80,11 @@ Definition updateRCSa (x : AcLabel) (y : TokenUpdate) (G : RelevantChainState) :
 Definition act (G : RelevantChainState) (eop : effOp) :=
   match eop with
   | Transfer (inl sendor) (inl dest) am => (* r/r *)
-    obind (updateRCSr dest (Negz am)) (updateRCSr sendor (Posz am) G)
+    obind (updateRCSr dest (Posz am)) (updateRCSr sendor (Negz am) G)
   | Transfer (inr sendor) (inl dest) am => (* a/r *)
-    updateRCSr dest (Negz am) (updateRCSa sendor (Posz am) G)
+    updateRCSr dest (Posz am) (updateRCSa sendor (Negz am) G)
   | Transfer (inl sendor) (inr dest) am => (* r/a *)
-    omap (updateRCSa dest (Negz am)) (updateRCSr sendor (Posz am) G)
+    omap (updateRCSa dest (Posz am)) (updateRCSr sendor (Negz am) G)
   | Transfer (inr _) (inr _) _ => None     (* a/a *)
   | Origination originator rclabel code storage balance delegation =>
     match relevantContracts G rclabel with
