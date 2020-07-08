@@ -18,12 +18,16 @@ Variable ContractAddress : Type.
 Definition Address := sum (Equality.sort RcLabel) (Equality.sort AcLabel).
 Definition ProgramType := prod MichelsonType MichelsonType.
 Variable rctype : RcLabel -> ProgramType.
+Variable actype : AcLabel -> MichelsonType.
 Variable progtype : Program -> ProgramType.
 Definition Delegation := option AcLabel.
+Definition StorageUpdate := MichelsonValue.
+Variable michelsonTypeCheck : MichelsonValue -> MichelsonType -> bool.
 Import intZmod.
 
 Inductive effOp : Type :=
-| Transfer : forall (sender : Address) (destination : Address) (amount : TokenMeasure), effOp
+| TransferAc : forall (sender : Address) (destination : AcLabel) (amount : TokenMeasure), effOp
+| TransferRc : forall (sender : Address) (destination : RcLabel) (amount : TokenMeasure) (storageUpdate : StorageUpdate), effOp
 | Origination : forall (originator : RcLabel) (rclabel : RcLabel) (code : Program) (storage : MichelsonValue) (balance : TokenMeasure) (delegation : Delegation), effOp
 | DelegationUpdate : forall (subject : RcLabel) (delegation : Delegation), effOp.
 
@@ -41,8 +45,15 @@ Record RelevantChainState :=
     affectedContracts : AcLabel -> option TokenUpdate;
   }.
 
-Definition updateRCSr (x : RcLabel) (y : TokenUpdate) (G : RelevantChainState) :=
-  match relevantContracts G x with
+Definition updateRCSr (x : RcLabel) (y : TokenUpdate)
+           (storageUpdate : option StorageUpdate)
+           (G : RelevantChainState) :=
+  if match storageUpdate with
+    | Some storageUpdate =>
+      michelsonTypeCheck storageUpdate (snd (rctype x))
+    | None => true
+     end
+  then match relevantContracts G x with
   | Some _ =>
     Some (mkRCS (fun X =>
       let Y := relevantContracts G X in
@@ -50,20 +61,36 @@ Definition updateRCSr (x : RcLabel) (y : TokenUpdate) (G : RelevantChainState) :
       then
         match Y with
         | Some Y =>
-          Some {|
-              program := program Y;
-              storage := storage Y;
-              balance :=
-                if intOrdered.lez 0 (sgz y)
-                then balance Y + `|y|
-                else balance Y - `|y|;
-              delegation := delegation Y;
-            |}
+          if intOrdered.lez 0 (sgz y)
+          then Some {|
+                   program := program Y;
+                   storage :=
+                     match storageUpdate with
+                     | Some z => z
+                     | None => storage Y
+                     end;
+                   balance := balance Y + `|y|;
+
+                   delegation := delegation Y;
+                 |}
+          else if balance Y >= `|y|
+          then Some {|
+                   program := program Y;
+                   storage :=
+                     match storageUpdate with
+                     | Some z => z
+                     | None => storage Y
+                     end;
+                   balance := balance Y - `|y|;
+                   delegation := delegation Y;
+                 |}
+          else None
         | None => None
         end
       else Y) (affectedContracts G))
   | None => None
-  end.
+  end
+  else None.
 
 Definition updateRCSa (x : AcLabel) (y : TokenUpdate) (G : RelevantChainState) :=
   mkRCS (relevantContracts G)
@@ -79,13 +106,13 @@ Definition updateRCSa (x : AcLabel) (y : TokenUpdate) (G : RelevantChainState) :
 
 Definition act (G : RelevantChainState) (eop : effOp) :=
   match eop with
-  | Transfer (inl sendor) (inl dest) am => (* r/r *)
-    obind (updateRCSr dest (Posz am)) (updateRCSr sendor (Negz am) G)
-  | Transfer (inr sendor) (inl dest) am => (* a/r *)
-    updateRCSr dest (Posz am) (updateRCSa sendor (Negz am) G)
-  | Transfer (inl sendor) (inr dest) am => (* r/a *)
-    omap (updateRCSa dest (Posz am)) (updateRCSr sendor (Negz am) G)
-  | Transfer (inr _) (inr _) _ => None     (* a/a *)
+  | TransferRc (inl sender) dest am su => (* r *)
+    obind (updateRCSr dest (Posz am) (Some su)) (updateRCSr sender (Negz am) None G)
+  | TransferRc (inr sender) dest am su => (* a *)
+    updateRCSr dest (Posz am) (Some su) (updateRCSa sender (Negz am) G)
+  | TransferAc (inl sender) dest am =>    (* r *)
+    omap (updateRCSa dest (Posz am)) (updateRCSr sender (Negz am) None G)
+  | TransferAc (inr _) _ _ => None        (* a *)
   | Origination originator rclabel code storage balance delegation =>
     match relevantContracts G rclabel with
     | None =>
@@ -99,7 +126,7 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
                    delegation:=delegation;
                  |}
                else relevantContracts G X) (affectedContracts G))
-      (updateRCSr originator (Posz balance) G)
+      (updateRCSr originator (Posz balance) None G)
     | Some _ => None
     end
   | DelegationUpdate subject delegation =>
