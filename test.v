@@ -25,6 +25,7 @@ Definition StorageUpdate := MichelsonValue.
 Variable michelsonTypeCheck : MichelsonValue -> MichelsonType -> bool.
 Variable rcn : nat -> ProgramType -> RcLabel.
 Variable inj_rcn : injective (fun '(a, b) => rcn a b).
+Variable cmp_rcn : forall k, rctype \o rcn k = id.
 Import intZmod.
 
 Inductive effOp : Type :=
