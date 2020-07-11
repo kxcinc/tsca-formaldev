@@ -23,6 +23,8 @@ Variable progtype : Program -> ProgramType.
 Definition Delegation := option AcLabel.
 Definition StorageUpdate := MichelsonValue.
 Variable michelsonTypeCheck : MichelsonValue -> MichelsonType -> bool.
+Variable rcn : nat -> ProgramType -> RcLabel.
+Variable inj_rcn : injective (fun '(a, b) => rcn a b).
 Import intZmod.
 
 Inductive effOp : Type :=
@@ -144,4 +146,17 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
     | None => None
     end
   end.
+
+Definition is_transfer (e : effOp) :=
+  match e with
+  | TransferAc _ _ _ | TransferRc _ _ _ _ => true
+  | _ => false
+  end.
+
+Inductive eotree : Type :=
+| Node : effOp -> list eotree -> eotree
+| Leaf of effOp.
+
+Inductive reotree : Type :=
+| Root : forall e, is_transfer e -> eotree -> reotree.
 End Sloppy.
