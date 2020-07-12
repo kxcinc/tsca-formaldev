@@ -25,14 +25,14 @@ Definition StorageUpdate := MichelsonValue.
 Variable michelsonTypeCheck : MichelsonValue -> MichelsonType -> bool.
 Variable rcn : nat -> ProgramType -> RcLabel.
 Variable inj_rcn : injective (fun '(a, b) => rcn a b).
-Variable cmp_rcn : forall k, rctype \o rcn k = id.
+Variable cmp_rcn : forall k, rctype \o rcn k =1 id.
 Import intZmod.
 
 Inductive effOp : Type :=
-| TransferAc : forall (sender : Address) (destination : AcLabel) (amount : TokenMeasure), effOp
-| TransferRc : forall (sender : Address) (destination : RcLabel) (amount : TokenMeasure) (storageUpdate : StorageUpdate), effOp
-| Origination : forall (originator : RcLabel) (rclabel : RcLabel) (code : Program) (storage : MichelsonValue) (balance : TokenMeasure) (delegation : Delegation), effOp
-| DelegationUpdate : forall (subject : RcLabel) (delegation : Delegation), effOp.
+| TransferAc : forall (sender : option Address) (destination : AcLabel) (amount : TokenMeasure), effOp
+| TransferRc : forall (sender : option Address) (destination : RcLabel) (amount : TokenMeasure) (storageUpdate : StorageUpdate), effOp
+| Origination : forall (originator : option RcLabel) (rclabel : RcLabel) (code : Program) (storage : MichelsonValue) (balance : TokenMeasure) (delegation : Delegation), effOp
+| DelegationUpdate : forall (subject : option RcLabel) (delegation : Delegation), effOp.
 
 Record RValue :=
   {
@@ -109,14 +109,14 @@ Definition updateRCSa (x : AcLabel) (y : TokenUpdate) (G : RelevantChainState) :
 
 Definition act (G : RelevantChainState) (eop : effOp) :=
   match eop with
-  | TransferRc (inl sender) dest am su => (* r *)
+  | TransferRc (Some (inl sender)) dest am su => (* r *)
     obind (updateRCSr dest (Posz am) (Some su)) (updateRCSr sender (Negz am) None G)
-  | TransferRc (inr sender) dest am su => (* a *)
+  | TransferRc (Some (inr sender)) dest am su => (* a *)
     updateRCSr dest (Posz am) (Some su) (updateRCSa sender (Negz am) G)
-  | TransferAc (inl sender) dest am =>    (* r *)
+  | TransferAc (Some (inl sender)) dest am =>    (* r *)
     omap (updateRCSa dest (Posz am)) (updateRCSr sender (Negz am) None G)
-  | TransferAc (inr _) _ _ => None        (* a *)
-  | Origination originator rclabel code storage balance delegation =>
+  | TransferAc (Some (inr _)) _ _ => None        (* a *)
+  | Origination (Some originator) rclabel code storage balance delegation =>
     match relevantContracts G rclabel with
     | None =>
       omap (fun G =>
@@ -132,7 +132,7 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
       (updateRCSr originator (Posz balance) None G)
     | Some _ => None
     end
-  | DelegationUpdate subject delegation =>
+  | DelegationUpdate (Some subject) delegation =>
     match relevantContracts G subject with
     | Some p =>
       Some (mkRCS (fun X =>
@@ -146,11 +146,19 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
                else relevantContracts G X) (affectedContracts G))
     | None => None
     end
+  | _ => None (* internal *)
   end.
 
 Definition is_transfer (e : effOp) :=
   match e with
   | TransferAc _ _ _ | TransferRc _ _ _ _ => true
+  | _ => false
+  end.
+
+Definition is_internal (e : effOp) :=
+  match e with
+  | TransferAc None _ _ | TransferRc None _ _ _
+  | DelegationUpdate None _ | Origination None _ _ _ _ _ => true
   | _ => false
   end.
 
@@ -160,4 +168,5 @@ Inductive eotree : Type :=
 
 Inductive reotree : Type :=
 | Root : forall e, is_transfer e -> eotree -> reotree.
+
 End Sloppy.
