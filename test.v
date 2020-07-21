@@ -23,16 +23,13 @@ Variable progtype : Program -> ProgramType.
 Definition Delegation := option AcLabel.
 Definition StorageUpdate := MichelsonValue.
 Variable michelsonTypeCheck : MichelsonValue -> MichelsonType -> bool.
-Variable rcn : nat -> ProgramType -> RcLabel.
-Variable inj_rcn : injective (fun '(a, b) => rcn a b).
-Variable cmp_rcn : forall k, rctype \o rcn k =1 id.
 Import intZmod.
 
 Inductive effOp : Type :=
-| TransferAc : forall (sender : option Address) (destination : AcLabel) (amount : TokenMeasure), effOp
-| TransferRc : forall (sender : option Address) (destination : RcLabel) (amount : TokenMeasure) (storageUpdate : StorageUpdate), effOp
-| Origination : forall (originator : option RcLabel) (rclabel : RcLabel) (code : Program) (storage : MichelsonValue) (balance : TokenMeasure) (delegation : Delegation), effOp
-| DelegationUpdate : forall (subject : option RcLabel) (delegation : Delegation), effOp.
+| TransferAc : forall (sender : Address) (destination : AcLabel) (amount : TokenMeasure), effOp
+| TransferRc : forall (sender : Address) (destination : RcLabel) (amount : TokenMeasure) (storageUpdate : StorageUpdate), effOp
+| Origination : forall (originator : RcLabel) (rclabel : RcLabel) (code : Program) (storage : MichelsonValue) (balance : TokenMeasure) (delegation : Delegation), effOp
+| DelegationUpdate : forall (subject : RcLabel) (delegation : Delegation), effOp.
 
 Record RValue :=
   {
@@ -109,14 +106,14 @@ Definition updateRCSa (x : AcLabel) (y : TokenUpdate) (G : RelevantChainState) :
 
 Definition act (G : RelevantChainState) (eop : effOp) :=
   match eop with
-  | TransferRc (Some (inl sender)) dest am su => (* r *)
+  | TransferRc (inl sender) dest am su => (* r *)
     obind (updateRCSr dest (Posz am) (Some su)) (updateRCSr sender (Negz am) None G)
-  | TransferRc (Some (inr sender)) dest am su => (* a *)
+  | TransferRc (inr sender) dest am su => (* a *)
     updateRCSr dest (Posz am) (Some su) (updateRCSa sender (Negz am) G)
-  | TransferAc (Some (inl sender)) dest am =>    (* r *)
+  | TransferAc (inl sender) dest am =>    (* r *)
     omap (updateRCSa dest (Posz am)) (updateRCSr sender (Negz am) None G)
-  | TransferAc (Some (inr _)) _ _ => None        (* a *)
-  | Origination (Some originator) rclabel code storage balance delegation =>
+  | TransferAc (inr _) _ _ => None        (* a *)
+  | Origination originator rclabel code storage balance delegation =>
     match relevantContracts G rclabel with
     | None =>
       omap (fun G =>
@@ -132,7 +129,7 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
       (updateRCSr originator (Posz balance) None G)
     | Some _ => None
     end
-  | DelegationUpdate (Some subject) delegation =>
+  | DelegationUpdate subject delegation =>
     match relevantContracts G subject with
     | Some p =>
       Some (mkRCS (fun X =>
@@ -146,7 +143,6 @@ Definition act (G : RelevantChainState) (eop : effOp) :=
                else relevantContracts G X) (affectedContracts G))
     | None => None
     end
-  | _ => None (* internal *)
   end.
 
 Definition is_transfer (e : effOp) :=
@@ -155,18 +151,70 @@ Definition is_transfer (e : effOp) :=
   | _ => false
   end.
 
-Definition is_internal (e : effOp) :=
-  match e with
-  | TransferAc None _ _ | TransferRc None _ _ _
-  | DelegationUpdate None _ | Origination None _ _ _ _ _ => true
-  | _ => false
-  end.
-
 Inductive eotree : Type :=
 | Node : effOp -> list eotree -> eotree
 | Leaf of effOp.
 
 Inductive reotree : Type :=
-| Root : forall e, is_transfer e -> eotree -> reotree.
+| Root : forall e, is_transfer e -> ChainId -> Timestamp -> RcLabel -> eotree -> reotree.
 
+Fixpoint insert (p : list nat) (t : eotree) (v : eotree) :=
+  match p with
+  | [::] => v
+  | n :: p' =>
+    match t with
+    | Node e cs =>
+      let t' := nth t cs n in
+      let cs' := set_nth t cs n (insert p' t' v) in
+      Node e cs'
+    | Leaf _ => v
+    end
+  end.
+
+Record environment :=
+  {
+    chainid : ChainId;
+    timestamp : Timestamp;
+    self: RcLabel;
+    src: RcLabel;
+    sender: RcLabel;
+  }.
+
+Record rc_label_gen :=
+  {
+    rcn: nat -> ProgramType -> RcLabel;
+    inj_rcn : injective (fun '(a, b) => rcn a b);
+    cmp_rcn : forall k, rctype \o rcn k =1 id;
+  }.
+
+Inductive InternalOperation :=
+| InternalTransfer : Address -> TokenMeasure -> InternalOperation
+| InternalOrigination : RcLabel -> Program -> MichelsonValue -> TokenMeasure -> Delegation -> InternalOperation
+| InternalDelegationUpdate : Delegation -> InternalOperation.
+
+Variable mich_eval :
+  environment -> rc_label_gen ->
+  RelevantChainState -> Program -> MichelsonValue -> TokenMeasure
+  -> MichelsonValue -> list InternalOperation * MichelsonValue.
+
+Fixpoint runriv (cid: ChainId) (ts: Timestamp) (adrs: Address) (rcn :rc_label_gen)
+           (nse: list nat * effOp) (G: option RelevantChainState) (k: nat)
+           (reot: reotree) (queue: list (list nat * effOp)) : option RelevantChainState * reotree.
+Check (
+match nse with
+| (_, TransferAc _ _ _ as eop) | (_, TransferRc _ _ _ _ as eop) =>
+  (* let G' := *)
+                                 _
+| (_, eop) =>
+  match queue with
+  | [::] => (obind (fun x => act x eop) G, reot)
+  | head :: rest =>
+    runriv cid ts adrs rcn head (obind (fun x => act x eop) G) k reot rest
+  end
+end).
+move=> cid ts adrs rcn.
+
+Definition eval
+
+End Michelson.
 End Sloppy.
