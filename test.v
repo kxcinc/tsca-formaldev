@@ -1,4 +1,5 @@
 From mathcomp Require Import all_ssreflect all_algebra.
+From Michocoq Require Import util macros syntax typer error.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -10,19 +11,20 @@ Variable ChainId : Type.
 Variable Timestamp : Type.
 Variable RcLabel : eqType.
 Variable AcLabel : eqType.
-Variable MichelsonValue : Type.
-Variable MichelsonType : Type.
-Definition TokenMeasure := nat.
-Definition TokenUpdate := int.
 Variable ContractAddress : Type.
-Definition Address := sum (Equality.sort RcLabel) (Equality.sort AcLabel).
+Definition MichelsonValue := untyped_syntax.concrete_data.
+Definition MichelsonType := type.
 Definition ProgramType := prod MichelsonType MichelsonType.
 Variable rctype : RcLabel -> ProgramType.
 Variable actype : AcLabel -> MichelsonType.
 Variable progtype : Program -> ProgramType.
-Definition Delegation := option AcLabel.
+Definition TokenMeasure := Datatypes.nat.
+Definition TokenUpdate := ssrint.int.
+Definition Address := sum (Equality.sort RcLabel) (Equality.sort AcLabel).
+Definition Delegation := Datatypes.option AcLabel.
 Definition StorageUpdate := MichelsonValue.
-Variable michelsonTypeCheck : MichelsonValue -> MichelsonType -> bool.
+Definition michelsonTypeCheck : MichelsonValue -> MichelsonType -> Datatypes.bool :=
+  fun a b => success (type_data Readable a b).
 Import intZmod.
 
 Inductive effOp : Type :=
@@ -41,12 +43,12 @@ Record RValue :=
 
 Record RelevantChainState :=
   mkRCS {
-    relevantContracts : RcLabel -> option RValue;
-    affectedContracts : AcLabel -> option TokenUpdate;
+    relevantContracts : RcLabel -> Datatypes.option RValue;
+    affectedContracts : AcLabel -> Datatypes.option TokenUpdate;
   }.
 
 Definition updateRCSr (x : RcLabel) (y : TokenUpdate)
-           (storageUpdate : option StorageUpdate)
+           (storageUpdate : Datatypes.option StorageUpdate)
            (G : RelevantChainState) :=
   if match storageUpdate with
     | Some storageUpdate =>
@@ -152,13 +154,13 @@ Definition is_transfer (e : effOp) :=
   end.
 
 Inductive eotree : Type :=
-| Node : effOp -> list eotree -> eotree
+| Node : effOp -> seq eotree -> eotree
 | Leaf of effOp.
 
 Inductive reotree : Type :=
 | Root : forall e, is_transfer e -> ChainId -> Timestamp -> RcLabel -> eotree -> reotree.
 
-Fixpoint insert (p : list nat) (t : eotree) (v : eotree) :=
+Fixpoint insert (p : seq Datatypes.nat) (t : eotree) (v : eotree) :=
   match p with
   | [::] => v
   | n :: p' =>
@@ -182,7 +184,7 @@ Record environment :=
 
 Record rc_label_gen :=
   {
-    rcn: nat -> ProgramType -> RcLabel;
+    rcn: Datatypes.nat -> ProgramType -> RcLabel;
     inj_rcn : injective (fun '(a, b) => rcn a b);
     cmp_rcn : forall k, rctype \o rcn k =1 id;
   }.
@@ -195,16 +197,34 @@ Inductive InternalOperation :=
 Variable mich_eval :
   environment -> rc_label_gen ->
   RelevantChainState -> Program -> MichelsonValue -> TokenMeasure
-  -> MichelsonValue -> list InternalOperation * MichelsonValue.
+  -> MichelsonValue -> seq InternalOperation * MichelsonValue.
 
-Fixpoint runriv (cid: ChainId) (ts: Timestamp) (adrs: Address) (rcn :rc_label_gen)
-           (nse: list nat * effOp) (G: option RelevantChainState) (k: nat)
-           (reot: reotree) (queue: list (list nat * effOp)) : option RelevantChainState * reotree.
+Fixpoint runriv (cid: ChainId) (ts: Timestamp) (adrs: Address) (rcn: rc_label_gen)
+           (nse: seq Datatypes.nat * effOp) (G: Datatypes.option RelevantChainState) (k: Datatypes.nat)
+           (reot: reotree) (queue: seq (seq Datatypes.nat * effOp)) : Datatypes.option RelevantChainState * reotree.
 Check (
 match nse with
-| (_, TransferAc _ _ _ as eop) | (_, TransferRc _ _ _ _ as eop) =>
-  (* let G' := *)
-                                 _
+| (_, TransferRc sender callee _ _ as eop) =>
+  (act x )
+  let code, storage,
+  let '(iops, storage') :=
+      mich_eval
+        {|
+          chainid:=cid;
+          timestamp:=ts;
+          self:=callee;
+          src:=adrs;
+          sender:=sender;
+        |}
+        rcn
+        G
+
+
+  let G' := obind (fun x => omap (updateRCSr callee 0 None) (act x eop)) G in
+
+
+  in.
+
 | (_, eop) =>
   match queue with
   | [::] => (obind (fun x => act x eop) G, reot)
