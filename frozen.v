@@ -21,7 +21,7 @@ Definition zero :=
 Definition validate_invocation {self_type S} :
   instruction_seq self_type false (pair parameter_ty storage_ty ::: S) S :=
   {
-    AMOUNT; PUSH mutez zero; COMPARE; LE;
+    AMOUNT; PUSH mutez zero; COMPARE; GE;
     IF_TRUE {FAILWITH} { };
     UNPAIR; DIP1 {UNPAIR}; SWAP; SOURCE; @MEM _ _ _ (mem_set _) _;
     IF_TRUE { } {FAILWITH};
@@ -57,7 +57,7 @@ Lemma frozen_correct
 <-> match contract_ env (Some "") unit addr with
   | Some c =>
     psi ([:: transfer_tokens env unit tt m c], (fund_owners, unfrozen), tt)
-    /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) (amount env) = Gt
+    /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) (amount env) = Lt
     /\ set.mem address_constant address_compare (source env) fund_owners
     /\ (BinInt.Z.compare (now env) unfrozen = Lt
        \/ BinInt.Z.compare (now env) unfrozen = Eq)
