@@ -21,13 +21,16 @@ Definition zero :=
 Definition validate_invocation {self_type S} :
   instruction_seq self_type false (pair parameter_ty storage_ty ::: S) S :=
   {
-    AMOUNT; PUSH mutez zero; COMPARE; GE;
+    AMOUNT; PUSH mutez zero; COMPARE; NEQ;
     IF_TRUE {FAILWITH} { };
     UNPAIR; DIP1 {UNPAIR}; SWAP; SOURCE; @MEM _ _ _ (mem_set _) _;
     IF_TRUE { } {FAILWITH};
-    SWAP; NOW; COMPARE; GT;
+    SWAP; NOW; COMPARE; LT;
     IF_TRUE {FAILWITH} { };
-    UNPAIR; BALANCE; COMPARE; GT;
+    UNPAIR; DUP;
+    BALANCE; COMPARE; LT;
+    IF_TRUE {FAILWITH} { };
+    PUSH mutez zero; COMPARE; EQ;
     IF_TRUE {FAILWITH} { };
     DROP1
   }.
@@ -44,6 +47,40 @@ Definition frozen : full_contract false parameter_ty None storage_ty :=
   UNPAIR;; perform_withdraw;;;
   {DIP1 {NIL operation}; CONS; PAIR}.
 
+Local Lemma lem x :
+  ~~ int64bv.sign x ->
+  match int64bv.to_Z x with
+  | BinNums.Z0 => true
+  | BinNums.Zpos _ => true
+  | BinNums.Zneg _ => false
+  end.
+Proof.
+  move: x.
+  rewrite /int64bv.sign /int64bv.to_Z /Bvector.Bsign /int64bv.int64 /Bvector.Bvector => x.
+  apply: (@Vector.rectS _ (fun n x => forall x : Vector.t Datatypes.bool n.+1, ~~ Vector.last x -> _) _ _ 63 x).
+  + move=> _ x0 H.
+    suff->: x0 = Vector.cons Datatypes.bool false 0 (Vector.nil Datatypes.bool) by [].
+    apply: (@Vector.caseS' _ 0 x0 (fun x => ~~ Vector.last x -> x = Vector.cons _ false _ (Vector.nil _)) _ H).
+    move=> h; apply: Vector.case0; by case: h.
+  + move=> _ {x} n _ IH x.
+    apply: (@Vector.caseS _ (fun n' (x0 : Vector.t Datatypes.bool n'.+1) =>
+                              n' = n.+1 -> ~~ Vector.last x0 -> _) _ n.+1 x) => // {x} h n0 x C.
+    move: C x => -> x.
+    rewrite Zdigits.two_compl_value_Sn /= => /IH.
+    case: (Zdigits.two_compl_value n x); by case: h.
+Qed.
+
+Lemma tez0 m :
+  tez.compare (extract (tez.of_Z BinNums.Z0) I) m = Lt
+\/ tez.compare (extract (tez.of_Z BinNums.Z0) I) m = Eq.
+Proof.
+  case: m => x.
+  rewrite /tez.compare /int64bv.int64_compare /int64bv.compare /=.
+  case H: (int64bv.sign x) => // _.
+  move/negP/negP/lem: H.
+  by case :(int64bv.to_Z x); auto.
+Qed.
+
 Lemma frozen_correct
       (env : @proto_env (Some (parameter_ty, None)))
       (fuel : Datatypes.nat)
@@ -57,12 +94,13 @@ Lemma frozen_correct
 <-> match contract_ env (Some "") unit addr with
   | Some c =>
     psi ([:: transfer_tokens env unit tt m c], (fund_owners, unfrozen), tt)
-    /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) (amount env) = Lt
+    /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) (amount env) = Eq
     /\ set.mem address_constant address_compare (source env) fund_owners
-    /\ (BinInt.Z.compare (now env) unfrozen = Lt
+    /\ (BinInt.Z.compare (now env) unfrozen = Gt
        \/ BinInt.Z.compare (now env) unfrozen = Eq)
-    /\ (tez.compare (balance env) m = Lt
+    /\ (tez.compare (balance env) m = Gt
        \/ tez.compare (balance env) m = Eq)
+    /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) m = Lt
   | None => False
   end.
 Proof.
@@ -72,19 +110,17 @@ Proof.
     - move: H;
       rewrite eval_seq_precond_correct /eval_seq_precond /= C /=.
       repeat case: ifP => //.
-      set C1 := (tez.compare _ _); case: C1 => //;
-      set C2 := (tez.compare _ _); case: C2 => //;
-      set C3 := (BinInt.Z.compare _ _); case: C3 => // *;
-      repeat split => //; auto.
+      set C1 := (tez.compare _ _); case H1: C1 => //.
+       set C2 := (tez.compare _ _); case: C2 => //.
+        set C4 := (tez.compare _ _); case: C4 => //.
+        set C3 := (BinInt.Z.compare _ _); case: C3 => //= *; repeat split => //; auto.
+       set C4 := (tez.compare _ _); case: C4 => //.
+       set C3 := (BinInt.Z.compare _ _); case: C3 => //= *; repeat split => //; auto.
+      subst C1; move: H1 (tez0 m) => ->; by case.
     - move: H; rewrite eval_seq_precond_correct /eval_seq_precond /= C /=.
       by repeat case: ifP.
   + rewrite eval_seq_precond_correct /eval_seq_precond /=.
-    move: H; case: (contract_ env (Some "") unit addr) => // ?.
-    by case => []H1 []-> []-> [][]-> []->.
+    move: H; case: (contract_ env (Some "") unit addr) => // a.
+    by case => []H1 []-> []-> [][]-> [][]-> ->.
 Qed.
-
-Lemma frozen_decrease :
-  precond (eval
-
-
 End frozen.
