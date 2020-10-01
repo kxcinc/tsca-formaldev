@@ -18,5 +18,5 @@ storage (" ++ micheline_pp (michelson2micheline_type storage_ty) 2 true true
             ++ ");
 code " ++ micheline_pp
             (michelson2micheline_instruction
-               (untype_instruction (Instruction_seq contract))) 2 true true
+               (untype_instruction untype_Readable (Instruction_seq contract))) 2 true true
             ++ ";}".

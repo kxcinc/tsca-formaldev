@@ -2,3 +2,4 @@
 ./util.v
 ./fundme.v
 ./wrapper.v
+./frozen.v
