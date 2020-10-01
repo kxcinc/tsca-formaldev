@@ -56,15 +56,23 @@ Local Lemma lem x :
   end.
 Proof.
   move: x.
-  rewrite /int64bv.sign /int64bv.to_Z /Bvector.Bsign /int64bv.int64 /Bvector.Bvector => x.
-  apply: (@Vector.rectS _ (fun n x => forall x : Vector.t Datatypes.bool n.+1, ~~ Vector.last x -> _) _ _ 63 x).
+  rewrite /int64bv.sign /int64bv.to_Z /Bvector.Bsign
+          /int64bv.int64 /Bvector.Bvector => x.
+  apply: (@Vector.rectS _ (fun n x => forall x : Vector.t Datatypes.bool n.+1,
+                           ~~ Vector.last x -> _) _ _ 63 x).
   + move=> _ x0 H.
-    suff->: x0 = Vector.cons Datatypes.bool false 0 (Vector.nil Datatypes.bool) by [].
-    apply: (@Vector.caseS' _ 0 x0 (fun x => ~~ Vector.last x -> x = Vector.cons _ false _ (Vector.nil _)) _ H).
+    suff->: x0 = Vector.cons Datatypes.bool false 0 (Vector.nil Datatypes.bool)
+      by [].
+    apply: (@Vector.caseS' _ 0 x0
+                           (fun x => ~~ Vector.last x -> x = Vector.cons
+                                                           _ false
+                                                           _ (Vector.nil _))
+                           _ H).
     move=> h; apply: Vector.case0; by case: h.
   + move=> _ {x} n _ IH x.
     apply: (@Vector.caseS _ (fun n' (x0 : Vector.t Datatypes.bool n'.+1) =>
-                              n' = n.+1 -> ~~ Vector.last x0 -> _) _ n.+1 x) => // {x} h n0 x C.
+                               n' = n.+1 -> ~~ Vector.last x0 -> _) _ n.+1 x)
+            => // {x} h n0 x C.
     move: C x => -> x.
     rewrite Zdigits.two_compl_value_Sn /= => /IH.
     case: (Zdigits.two_compl_value n x); by case: h.
@@ -113,9 +121,11 @@ Proof.
       set C1 := (tez.compare _ _); case H1: C1 => //.
        set C2 := (tez.compare _ _); case: C2 => //.
         set C4 := (tez.compare _ _); case: C4 => //.
-        set C3 := (BinInt.Z.compare _ _); case: C3 => //= *; repeat split => //; auto.
+        set C3 := (BinInt.Z.compare _ _); case: C3 => //= *;
+         repeat split => //; auto.
        set C4 := (tez.compare _ _); case: C4 => //.
-       set C3 := (BinInt.Z.compare _ _); case: C3 => //= *; repeat split => //; auto.
+       set C3 := (BinInt.Z.compare _ _); case: C3 => //= *;
+        repeat split => //; auto.
       subst C1; move: H1 (tez0 m) => ->; by case.
     - move: H; rewrite eval_seq_precond_correct /eval_seq_precond /= C /=.
       by repeat case: ifP.
