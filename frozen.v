@@ -97,8 +97,8 @@ Lemma frozen_correct
       (unfrozen : data timestamp)
       (fund_owners : data (set address))
       (psi : stack (pair (list operation) storage_ty ::: [::]) -> Prop) :
-  fuel > 5 ->
-  precond (eval_seq env frozen fuel ((m, addr), (fund_owners, unfrozen), tt)) psi
+fuel > 5 ->
+precond (eval_seq env frozen fuel ((m, addr), (fund_owners, unfrozen), tt)) psi
 <-> match contract_ env (Some "") unit addr with
   | Some c =>
     psi ([:: transfer_tokens env unit tt m c], (fund_owners, unfrozen), tt)
@@ -132,5 +132,22 @@ Proof.
   + rewrite eval_seq_precond_correct /eval_seq_precond /=.
     move: H; case: (contract_ env (Some "") unit addr) => // a.
     by case => []H1 []-> []-> [][]-> [][]-> ->.
+Qed.
+
+Lemma frozen_preserve_storage
+      (env : @proto_env (Some (parameter_ty, None)))
+      (fuel : Datatypes.nat)
+      (m : tez.mutez)
+      (addr : data address)
+      (unfrozen : data timestamp)
+      (fund_owners : data (set address))
+      returned_operations new_storage :
+  fuel > 5 ->
+  eval_seq env frozen fuel ((m, addr), (fund_owners, unfrozen), tt)
+= Return (returned_operations, new_storage, tt) ->
+  new_storage = (fund_owners, unfrozen).
+Proof.
+  move=> f5; rewrite return_precond frozen_correct //=.
+  by case: (contract_ env (Some "") unit addr) => // ? [][] + ->.
 Qed.
 End frozen.
