@@ -8,7 +8,7 @@ Unset Printing Implicit Defensive.
 
 Definition parameter_ty := pair (mutez (* amount *)) (address (* beneficiary *)).
 Definition storage_ty :=
-  pair (set (* fund_owners *) address) (timestamp (* unfrozen *)).
+  pair (set address (* fund_owners *)) (timestamp (* unfrozen *)).
 
 Module frozen(C : ContractContext).
 Module semantics := Semantics C. Import semantics.
@@ -25,13 +25,17 @@ Definition validate_invocation {self_type S} :
     IF_TRUE {FAILWITH} { };
     UNPAIR; DIP1 {UNPAIR}; SWAP; SOURCE; @MEM _ _ _ (mem_set _) _;
     IF_TRUE { } {FAILWITH};
+    (* source of operation is not whitelisted for withdrawal operations *)
     SWAP; NOW; COMPARE; LT;
     IF_TRUE {FAILWITH} { };
+    (* deposit still frozen *)
     UNPAIR; DUP;
     BALANCE; COMPARE; LT;
     IF_TRUE {FAILWITH} { };
+    (* requested withdrawal amount exceeds the balance *)
     PUSH mutez zero; COMPARE; EQ;
     IF_TRUE {FAILWITH} { };
+    (* frozen contract cannot accept positive amount transfer *)
     DROP1
   }.
 
