@@ -1,6 +1,6 @@
 #!/bin/bash
 TMP=$(mktemp)
-coqtop -q -R . tscaformaldev << EOF | sed -e 's/""/"/g' | sed -e ':loop;N;$!b loop;s/\n/ /g' | grep -oP "\{[\s\S]*\}" > $TMP
+coqtop -q -R . tscaformaldev << EOF | sed -e 's/""/"/g' | sed -e ':loop;N;$!b loop;s/\n/ /g' | sed -e 's/^[^"]*//' | sed -e 's/[^"]*$//' | sed -e 's/^"//' -e 's/"$//' > $TMP
 Require Import String.
 From Michocoq Require Import semantics util macros.
 From tscaformaldev Require Import util ccgen.
@@ -12,7 +12,7 @@ Open Scope string_scope.
 Compute match CCG.genprog O.$1 with
         | None => ""
         | Some x =>
-          "{ PAIR " ++ ppc x ++ " " ++ ppc CCG.initprog ++ " }"
+          "Pair " ++ ppc x ++ " " ++ ppc CCG.initprog ++ ""
         end.
 End out.
 EOF
