@@ -5,3 +5,6 @@ Makefile.coq: _CoqProject
 
 %.tz: %.vo util.vo
 	./maketz $(basename $<) $@
+
+%.ccg: %.vo util.vo
+	./makeccg $(basename $<) $@
