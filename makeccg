@@ -12,7 +12,7 @@ Open Scope string_scope.
 Compute match CCG.genprog O.$1 with
         | None => ""
         | Some x =>
-          "Pair " ++ ppc x ++ " " ++ ppc CCG.initprog ++ ""
+          "Pair " ++ ppc x ++ " " ++ ppc CCG.initprog
         end.
 End out.
 EOF

@@ -1,4 +1,4 @@
-{ PAIR { DIP 1
+( Pair { DIP 1
              { NIL (pair (pair string (lambda (pair bytes bytes) (pair (list operation) bytes)))
                          (pair bytes mutez)) } ;
          LAMBDA
@@ -61,4 +61,4 @@
          LAMBDA
            (map string address)
            (list (pair string bytes))
-           { DROP 1 ; NIL (pair string bytes) } } }
+           { DROP 1 ; NIL (pair string bytes) } } )
