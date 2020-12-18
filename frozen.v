@@ -103,7 +103,7 @@ Lemma frozen_correct
       (psi : stack (pair (list operation) storage_ty ::: [::]) -> Prop) :
 fuel > 5 ->
 precond (eval_seq env frozen fuel ((m, addr), (fund_owners, unfrozen), tt)) psi
-<-> match contract_ env (Some "") unit addr with
+<-> match contract_ (Some "") unit addr with
   | Some c =>
     psi ([:: transfer_tokens env unit tt m c], (fund_owners, unfrozen), tt)
     /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) (amount env) = Eq
@@ -118,24 +118,26 @@ precond (eval_seq env frozen fuel ((m, addr), (fund_owners, unfrozen), tt)) psi
 Proof.
   move=> F; have<-: 6 + (fuel - 6) = fuel by rewrite addnC subnK.
   split => H.
-  + case C : (contract_ env (Some "") unit addr).
+  + case C : (contract_ (Some "") unit addr).
     - move: H;
       rewrite eval_seq_precond_correct /eval_seq_precond /= C /=.
-      repeat case: ifP => //.
-      set C1 := (tez.compare _ _); case H1: C1 => //.
+      case => + []+ []+ []+ []+ []+ [][->].
+      set C1 := (tez.compare _ _); case: C1 => // _ ->.
        set C2 := (tez.compare _ _); case: C2 => //.
-        set C4 := (tez.compare _ _); case: C4 => //.
-        set C3 := (BinInt.Z.compare _ _); case: C3 => //= *;
-         repeat split => //; auto.
-       set C4 := (tez.compare _ _); case: C4 => //.
-       set C3 := (BinInt.Z.compare _ _); case: C3 => //= *;
-        repeat split => //; auto.
-      subst C1; move: H1 (tez0 m) => ->; by case.
+        set C4 := (tez.compare _ _); case H4: C4 => //.
+         set C3 := (BinInt.Z.compare _ _); case: C3 => //= *;
+          repeat split => //; auto.
+        subst C4; move: H4 (tez0 m) => ->; by case.
+        set C4 := (tez.compare _ _); case H4: C4 => //.
+         set C3 := (BinInt.Z.compare _ _); case: C3 => //= *;
+          repeat split => //; auto.
+        subst C4; move: H4 (tez0 m) => ->; by case.
     - move: H; rewrite eval_seq_precond_correct /eval_seq_precond /= C /=.
-      by repeat case: ifP.
+      by repeat case => ?.
   + rewrite eval_seq_precond_correct /eval_seq_precond /=.
-    move: H; case: (contract_ env (Some "") unit addr) => // a.
-    by case => []H1 []-> []-> [][]-> [][]-> ->.
+    move: H; case: (contract_ (Some "") unit addr) => // a.
+    case => []H1 []-> []-> [][]-> [][]-> ->;
+    repeat split; by exists a.
 Qed.
 
 Lemma frozen_preserve_storage
@@ -152,6 +154,6 @@ Lemma frozen_preserve_storage
   new_storage = (fund_owners, unfrozen).
 Proof.
   move=> f5; rewrite return_precond frozen_correct //=.
-  by case: (contract_ env (Some "") unit addr) => // ? [][] + ->.
+  by case: (contract_ (Some "") unit addr) => // ? [][] + ->.
 Qed.
 End frozen.

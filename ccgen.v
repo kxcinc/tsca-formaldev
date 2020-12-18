@@ -25,7 +25,7 @@ Definition reconstr_op {self_type A B}
   | LE _ => LE
   | GE _ => GE
   | OR _ s _ => @OR _ _ s _
-  | AND _ s _ => @AND _ _ s _
+  | AND _ _ s _ => @AND _ _ _ s _
   | XOR _ s _ => @XOR _ _ s _
   | NOT _ s _ => @NOT _ _ s _
   | NEG _ s _ => @NEG _ _ s _
@@ -97,10 +97,10 @@ with reconstr1 {self_type a b tff} (ins: instruction self_type tff a b) :
   | FAILWITH _ _ _ _ => Some FAILWITH
   | IF_ _ _ _ _ _ _ _ _ i x y =>
     obind (fun a => omap a (reconstr y)) (omap (IF_ i) (reconstr x))
-  | LOOP_ _ _ _ _ _ i x => omap (LOOP_ i) (reconstr x)
+  | LOOP_ _ _ _ _ _ _ i x => omap (LOOP_ i) (reconstr x)
   | PUSH t x _ _ => Some (PUSH t x)
   | LAMBDA x y _ _ _ z => omap (LAMBDA x y) (reconstr z)
-  | ITER _ _ _ _ x => omap ITER (reconstr x)
+  | ITER _ _ _ _ _ x => omap ITER (reconstr x)
   | MAP _ _ _ _ _ x => omap MAP (reconstr x)
   | CREATE_CONTRACT _ _ _ g p an x => Some (CREATE_CONTRACT g p an x)
   | SELF _ _ _ annot_opt H => None
