@@ -142,4 +142,18 @@ match reconstr prog with
          PUSH _ "main"; PAIR; PAIR; CONS})
 | None => None
 end.
+
+Definition initprog {A} :
+  instruction None Datatypes.false A (initprog_ty :: A) :=
+LAMBDA _ _ {DROP1; LAMBDA _ _ {DROP1; NIL (pair _ bytes)}}.
+
+Definition ccgen
+           {parameter_ty storage_ty A}
+           (prog: full_contract false parameter_ty None storage_ty) :
+  Datatypes.option (instruction None Datatypes.false A
+                                (pair genprog_ty initprog_ty :: A)) :=
+match genprog prog with
+| Some gp => Some (Instruction_seq {initprog; gp; PAIR})
+| None => None
+end.
 End ccgen.

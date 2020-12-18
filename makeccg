@@ -9,7 +9,7 @@ Module out (C : ContractContext).
 Module O := $1 C.
 Module CCG := ccgen C.
 Open Scope string_scope.
-Compute match CCG.genprog O.$1 with
+Compute match CCG.ccgen O.$1 with
         | None => ""
         | Some x => ppc x
         end.
