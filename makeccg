@@ -16,4 +16,4 @@ Compute match CCG.genprog O.$1 with
         end.
 End out.
 EOF
-./michelson-reformat < $TMP > $2
+./michelson-reformat -expr < $TMP > $2
