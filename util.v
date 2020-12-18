@@ -21,7 +21,7 @@ code " ++ micheline_pp
                (untype_instruction untype_Readable (Instruction_seq contract))) 2 true true
             ++ ";}".
 
-Definition ppc self_type tff a b (ins: instruction self_type tff a b) :=
+Definition ppc self_type tff a b (ins: instruction_seq self_type tff a b) :=
 micheline_pp
   (michelson2micheline_instruction
-     (untype_instruction untype_Readable ins)) 2 true true.
+     (untype_instruction untype_Readable (Instruction_seq ins))) 2 true true.

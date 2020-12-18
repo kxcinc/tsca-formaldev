@@ -6,17 +6,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Definition genprog_ty :=
-  (lambda
-     (pair bytes mutez)
-     (list (pair (pair string (lambda (pair bytes bytes)
-                                      (pair (list operation) bytes)))
-                 (pair bytes mutez)))).
-Definition initprog_ty :=
-  (lambda
-     (pair bytes mutez)
-     (lambda (map string address) (list (pair string bytes)))).
-
 Module ccgen(C : ContractContext).
 Module semantics := Semantics C. Import semantics.
 Require Import String.
@@ -120,14 +109,16 @@ with reconstr1 {self_type a b tff} (ins: instruction self_type tff a b) :
   | Instruction_opcode _ _ _ op => Some (Instruction_opcode (reconstr_op op))
   end.
 
-Definition genprog {parameter_ty storage_ty A}
+Open Scope michelson_scope.
+
+Definition genprog {parameter_ty storage_ty}
            (prog: full_contract false parameter_ty None storage_ty) :
-  Datatypes.option (instruction None Datatypes.false A (genprog_ty :: A)) :=
-match reconstr prog with
-| Some prog0 =>
-    Some
-      (LAMBDA _ _
-         {DIP1 {NIL _};
+  Datatypes.option (instruction_seq None false (pair bytes mutez ::: [::])
+    (list (pair (pair syntax_type.string (lambda (pair bytes bytes)
+    (pair (list operation) bytes))) (pair bytes mutez)) ::: [::])) :=
+  match reconstr prog with
+  | Some prog0 =>
+    Some {DIP1 {NIL _};
          LAMBDA _ _
                 {
                   UNPAIR; UNPACK parameter_ty;
@@ -139,21 +130,13 @@ match reconstr prog with
                                      {UNPAIR; DIP1 {PACK}; PAIR})
                           }
                 };
-         PUSH _ "main"; PAIR; PAIR; CONS})
-| None => None
-end.
+         PUSH _ "main"; PAIR; PAIR; CONS}
+  | None => None
+  end.
 
-Definition initprog {A} :
-  instruction None Datatypes.false A (initprog_ty :: A) :=
-LAMBDA _ _ {DROP1; LAMBDA _ _ {DROP1; NIL (pair _ bytes)}}.
-
-Definition ccgen
-           {parameter_ty storage_ty A}
-           (prog: full_contract false parameter_ty None storage_ty) :
-  Datatypes.option (instruction None Datatypes.false A
-                                (pair genprog_ty initprog_ty :: A)) :=
-match genprog prog with
-| Some gp => Some (Instruction_seq {initprog; gp; PAIR})
-| None => None
-end.
+Definition initprog :
+  instruction_seq None false (pair bytes mutez ::: [::])
+    (lambda (map syntax_type.string address)
+       (list (pair syntax_type.string bytes)) ::: [::]) :=
+  {DROP1; LAMBDA _ _ {DROP1; NIL (pair _ bytes)}}.
 End ccgen.
