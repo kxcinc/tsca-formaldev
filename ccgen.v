@@ -22,8 +22,6 @@ Module semantics := Semantics C. Import semantics.
 Require Import String.
 Open Scope string_scope.
 
-Open Scope michelson_scope.
-
 Definition reconstr_op {self_type A B}
            (op: @opcode self_type A B) : @opcode None A B :=
   match op with
@@ -133,11 +131,12 @@ match reconstr prog with
          LAMBDA _ _
                 {
                   UNPAIR; UNPACK parameter_ty;
-                  IF_NONE {PUSH syntax_type.string "baka"; FAILWITH}
+                  IF_NONE {PUSH _ "baka"; FAILWITH}
                           {
                             SWAP; UNPACK storage_ty;
-                            IF_NONE {PUSH syntax_type.string "yaharibaka"; FAILWITH}
-                                    (SWAP;; PAIR;; prog0;;; {UNPAIR; DIP1 {PACK}; PAIR})
+                            IF_NONE {PUSH _ "yaharibaka"; FAILWITH}
+                                    (SWAP;; PAIR;; prog0;;;
+                                     {UNPAIR; DIP1 {PACK}; PAIR})
                           }
                 };
          PUSH _ "main"; PAIR; PAIR; CONS})
