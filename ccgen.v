@@ -122,10 +122,10 @@ Definition genprog {parameter_ty storage_ty}
          LAMBDA _ _
                 {
                   UNPAIR; UNPACK parameter_ty;
-                  IF_NONE {PUSH _ "baka"; FAILWITH}
+                  IF_NONE {PUSH _ "unpack param"; FAILWITH}
                           {
                             SWAP; UNPACK storage_ty;
-                            IF_NONE {PUSH _ "yaharibaka"; FAILWITH}
+                            IF_NONE {PUSH _ "unpack storage"; FAILWITH}
                                     (SWAP;; PAIR;; prog0;;;
                                      {UNPAIR; DIP1 {PACK}; PAIR})
                           }
