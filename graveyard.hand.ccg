@@ -1,0 +1,26 @@
+Pair
+  { { DUP ; CAR ; DIP 1 { CDR } };
+    LAMBDA
+      (pair (bytes :wparam)  (bytes :wstorage))
+      (pair (list operation) bytes)
+      { DUP; CAR; UNPACK unit;
+        IF_NONE
+          { PUSH string "unpack param"; FAILWITH }
+          { DROP };
+        CDR;
+        NIL operation;
+        PAIR; } ;
+    PUSH @rclabel string "main";
+    PAIR;
+    DIP { PAIR };
+    PAIR;
+    DIP { NIL
+            (pair
+               (pair string (lambda (pair bytes bytes) (pair (list operation) bytes)))
+               (pair bytes mutez)) };
+    CONS; }
+  { DROP 1 ;
+    LAMBDA
+      (map string address)
+      (list (pair string bytes))
+      { DROP 1 ; NIL (pair string bytes) } }

@@ -1,0 +1,12 @@
+{ parameter bytes;
+  storage bytes;
+  code
+    { DUP;
+      { CAR; UNPACK unit;
+        IF_NONE
+          { PUSH string "unpack param"; FAILWITH }
+          { DROP } };
+      CDR;
+      NIL operation;
+      PAIR; }
+}
