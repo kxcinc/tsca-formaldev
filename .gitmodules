@@ -1,0 +1,3 @@
+[submodule "vendors/michelson-reformatter"]
+	path = vendors/michelson-reformatter
+	url = https://github.com/kxcteam/michelson-reformatter.git
