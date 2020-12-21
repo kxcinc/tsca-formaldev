@@ -7,11 +7,11 @@
            { { DUP ; CAR ; DIP 1 { CDR } } ;
              UNPACK (pair mutez address) ;
              IF_NONE
-               { PUSH string "baka" ; FAILWITH }
+               { PUSH string "unpack param" ; FAILWITH }
                { SWAP ;
                  UNPACK (pair (set address) timestamp) ;
                  IF_NONE
-                   { PUSH string "yaharibaka" ; FAILWITH }
+                   { PUSH string "unpack storage" ; FAILWITH }
                    { SWAP ;
                      PAIR ;
                      DUP ;
