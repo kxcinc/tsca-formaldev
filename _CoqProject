@@ -4,3 +4,4 @@
 ./fundme.v
 ./wrapper.v
 ./frozen.v
+./graveyard.v
