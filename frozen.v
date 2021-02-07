@@ -6,10 +6,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Definition parameter_ty := pair (mutez (* amount *)) (address (* beneficiary *)).
-Definition storage_ty :=
-  pair (set address (* fund_owners *)) (timestamp (* unfrozen *)).
-
 Module frozen(C : ContractContext).
 Module semantics := Semantics C. Import semantics.
 Require Import String.
@@ -17,6 +13,10 @@ Open Scope string_scope.
 
 Definition zero :=
   Comparable_constant syntax_type.mutez (extract (tez.of_Z BinNums.Z0) I).
+
+Definition parameter_ty := pair (mutez (* amount *)) (address (* beneficiary *)).
+Definition storage_ty :=
+  pair (set address (* fund_owners *)) (timestamp (* unfrozen *)).
 
 Definition validate_invocation {self_type S} :
   instruction_seq self_type false (pair parameter_ty storage_ty ::: S) S :=
