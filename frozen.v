@@ -16,7 +16,7 @@ Require Import String.
 Open Scope string_scope.
 
 Definition zero :=
-  Mutez_constant (Mk_mutez (extract (tez.of_Z BinNums.Z0) I)).
+  Comparable_constant syntax_type.mutez (extract (tez.of_Z BinNums.Z0) I).
 
 Definition validate_invocation {self_type S} :
   instruction_seq self_type false (pair parameter_ty storage_ty ::: S) S :=
@@ -113,7 +113,7 @@ precond (eval_seq env frozen fuel ((m, addr), (fund_owners, unfrozen), tt)) psi
     /\ (tez.compare (balance env) m = Gt
        \/ tez.compare (balance env) m = Eq)
     /\ tez.compare (extract (tez.of_Z BinNums.Z0) I) m = Lt
-  | None => False
+  | None => false
   end.
 Proof.
   move=> F; have<-: 6 + (fuel - 6) = fuel by rewrite addnC subnK.
