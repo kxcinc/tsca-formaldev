@@ -48,4 +48,22 @@ Proof.
     case: H; case:(unpack env unit param) => // a _ ?.
     by exists a.
 Qed.
+
+Lemma graveyard_invocable
+      (env : @proto_env (Some (Comparable_type parameter_ty, None)))
+      (fuel : Datatypes.nat)
+      (param : data bytes)
+      (storage : data bytes)
+      (psi : stack (pair (list operation) storage_ty ::: [::]) -> Prop) :
+fuel > 3 ->
+unpack env unit param <> None ->
+precond (eval_seq env graveyard fuel ((param, storage), tt)) psi
+<-> psi ([::], storage, tt).
+Proof.
+  move=> F up.
+  split.
+   by case/(graveyard_correct _ _ _ _ F).
+  move=> pt.
+  by apply/graveyard_correct.
+Qed.
 End graveyard.
