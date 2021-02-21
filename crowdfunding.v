@@ -105,37 +105,37 @@ Definition validate_refund {self_type S} :
 {NOW; DIP1 unconditional_refund_start; SWAP; COMPARE; LT};;;
  IF_TRUE {FAILWITH} { };; withdrawn;;; {IF_TRUE {FAILWITH} { }}.
 
-Definition crowdfunding : full_contract false parameter_ty None storage_ty.
-  apply: (DUP;; _).
-  apply: (CAR;; _).
-  apply: (DIP1 {CDR};; _).
-  apply: (IF_LEFT (_ : instruction_seq (Some (parameter_ty, None)) false _ _) (_ : instruction_seq (Some (parameter_ty, None)) false _ _);; NOOP).
-   apply: (IMPLICIT_ACCOUNT;; ADDRESS;; _).
-   apply: (DUP;; _).
-   apply: (DIIP refund_table;; _).
-   apply: (DIP1 {@GET _ _ _ (get_bigmap address mutez) _};; _).
-   apply: (DIP1 {IF_SOME {AMOUNT; @ADD _ _ _ add_tez_tez _} {AMOUNT}};; _).
-   apply: (DIP1 {SOME};; _).
-   apply: (DIIP refund_table;; _).
-   apply: (@UPDATE _ _ _ _ (update_bigmap address mutez) _;; _).
-   apply: (DIP1 validate_time;; _).
-   apply: (update_refund_table;;; _).
-   apply: (NIL operation;; PAIR;; NOOP).
-  apply: (IF_LEFT (_ : instruction_seq (Some (parameter_ty, None)) false _ _) (_ : instruction_seq (Some (parameter_ty, None)) false _ _);; NOOP).
-   apply: (DIP1 validate_withdraw;; _).
-   apply: (BALANCE;; _).
-   apply: (create_transfer;;; _).
-   apply: (NIL operation;; SWAP;; CONS;; DIP1 set_withdrawn;; PAIR;; NOOP).
-  apply: (DIP1 refund_table;; DUP;; _).
-  apply: (DIP1 {@GET _ _ _ (get_bigmap address mutez) _};; SWAP;; _).
-  apply: (IF_NONE {FAILWITH} (_ : instruction_seq _ false _ _);; NOOP).
-  apply: (SWAP;; DIP1 {SWAP};; _).
-  apply: (NONE mutez;; DIIP refund_table;; SWAP;; (_ : instruction_seq _ false _ _)).
-  apply: (DUP;; _).
-  apply: (DIP1 {@UPDATE _ _ _ _ (update_bigmap address mutez) _};; _).
-  apply: (DIIP validate_refund;; _).
-  apply: (DIP1 update_refund_table;; _).
-  apply: (DIP1 {SWAP};; SWAP;; create_transfer;;; _).
-  apply: (NIL operation;; SWAP;; CONS;; DIP1 set_withdrawn;; PAIR;; NOOP).
-Defined.
+Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
+  {DUP; CAR; DIP1 {CDR};
+  IF_LEFT
+  (IMPLICIT_ACCOUNT;;
+   ADDRESS;;
+   DUP;;
+   DIIP refund_table;;
+   DIP1 {@GET _ _ _ (get_bigmap address mutez) _};;
+   DIP1 {IF_SOME {AMOUNT; @ADD _ _ _ add_tez_tez _} {AMOUNT}};;
+   DIP1 {SOME};;
+   DIIP refund_table;;
+   @UPDATE _ _ _ _ (update_bigmap address mutez) _;;
+   DIP1 validate_time;; update_refund_table;;; {NIL operation; PAIR})
+ {IF_LEFT
+  (DIP1 validate_withdraw;;
+  BALANCE;;
+  create_transfer;;;
+  {NIL operation; SWAP; CONS; DIP1 set_withdrawn; PAIR})
+  {DIP1 refund_table; DUP; DIP1 {@GET _ _ _ (get_bigmap address mutez) _}; SWAP;
+   IF_NONE {FAILWITH}
+     (SWAP;;
+      DIP1 {SWAP};;
+      NONE mutez;;
+      DIIP refund_table;;
+      SWAP;;
+      DUP;;
+      DIP1 {@UPDATE _ _ _ _ (update_bigmap address mutez) _};;
+      DIIP validate_refund;;
+      DIP1 update_refund_table;;
+      DIP1 {SWAP};;
+      SWAP;;
+      create_transfer;;;
+      {NIL operation; SWAP; CONS; DIP1 set_withdrawn; PAIR})}}}.
 End crowdfunding.
