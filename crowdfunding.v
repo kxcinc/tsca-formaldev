@@ -50,8 +50,8 @@ Definition validate_time {self_type S} :
   instruction_seq self_type false
                   (storage_ty ::: S)
                   (storage_ty ::: S) :=
-  funding_start;;; {NOW; COMPARE; LE;
-  DIP1 funding_end; DIP1 {NOW; SWAP; COMPARE; LE}; AND; NOT;
+  funding_start;;; {NOW; COMPARE; GE;
+  DIP1 funding_end; DIP1 {NOW; SWAP; COMPARE; GE}; AND; NOT;
   IF_TRUE {FAILWITH} { }}.
 
 Definition unconditional_refund_start {self_type S} :
@@ -82,8 +82,8 @@ Definition validate_withdraw {self_type S} :
   instruction_seq self_type false
                   (storage_ty ::: S)
                   (storage_ty ::: S) :=
- funding_start;;; NOW;; COMPARE;; LE;;
- {DIP1 funding_end; DIP1 {NOW; SWAP; COMPARE; LE}; AND; NOT};;;
+ funding_start;;; NOW;; COMPARE;; GE;;
+ {DIP1 funding_end; DIP1 {NOW; SWAP; COMPARE; GE}; AND; NOT};;;
  DIP1 {NOW; DIP1 unconditional_refund_start; SWAP; COMPARE; LE};;
  @OR _ _ bitwise_bool _;; IF_TRUE {FAILWITH} { };;
  withdrawn;;; IF_TRUE {FAILWITH} { };;
@@ -138,4 +138,158 @@ Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
       SWAP;;
       create_transfer;;;
       {NIL operation; SWAP; CONS; DIP1 set_withdrawn; PAIR})}}}.
+
+Local Definition geq a b :=
+  BinInt.Z.compare a b = Gt \/ BinInt.Z.compare a b = Eq.
+
+Local Definition gt a b :=
+  BinInt.Z.compare a b = Gt.
+
+Import Notations.
+
+Lemma crowdfunding_correct_contribute
+      (env : @proto_env (Some (parameter_ty, None)))
+      (fuel : Datatypes.nat)
+      (refund_address : data key_hash)
+      (raisers : data (set address))
+      (refund_table : data (big_map address mutez))
+      (funding_start : data timestamp)
+      (funding_end : data timestamp)
+      (unconditional_refund_start : data timestamp)
+      (withdrawn : data bool)
+      (psi : stack (pair (list operation) storage_ty ::: [::]) -> Prop) :
+let refund_amount x := map.get _ _ _
+                             (address_ _ (implicit_account x)) in
+let insert := map.insert address_constant tez.mutez address_compare
+                     (compare_eq_iff address) (gt_trans address)
+                     (Implicit refund_address) in
+fuel > 5 ->
+precond (eval_seq env crowdfunding fuel
+         (inl refund_address,
+          ((raisers, refund_table),
+           ((withdrawn, funding_start),
+            (funding_end, unconditional_refund_start))), tt)) psi <->
+let changed_refund_table :=
+match refund_amount refund_address refund_table with
+| Some x =>
+  let! z := (tez.of_Z (BinInt.Z.add (tez.to_Z (amount env)) (tez.to_Z x))) in
+  Return (insert z refund_table)
+| None =>
+  Return (insert (amount env) refund_table)
+end in
+precond changed_refund_table (fun t =>
+geq (now env) funding_start /\ geq funding_end (now env)
+/\ psi ([::],
+     ((raisers, t),
+      ((withdrawn, funding_start),
+       (funding_end, unconditional_refund_start))), tt)).
+Proof.
+  move=> ra ins F; have<-: 6 + (fuel - 6) = fuel by rewrite addnC subnK.
+  rewrite /geq; subst ra ins; split.
+  + rewrite eval_seq_precond_correct /eval_seq_precond /=.
+    set H := map.get _ _ _ _ _.
+    case: H => [a|].
+    - set T := tez.of_Z _.
+      case: T => //= T [] /negP/negP /andP[].
+      case: (BinInt.Z.compare (now env) funding_start) => //;
+      case: (BinInt.Z.compare funding_end (now env)) => //; auto.
+    - case=> [] /negP/negP /andP[] /=.
+      case: (BinInt.Z.compare (now env) funding_start) => //;
+      case: (BinInt.Z.compare funding_end (now env)) => //; auto.
+  + rewrite eval_seq_precond_correct /eval_seq_precond /=.
+    set H := map.get _ _ _ _ _.
+    case: H => [a|/=].
+    - set T := tez.of_Z _.
+      case: T => //= T [] + [].
+      case: (BinInt.Z.compare (now env) funding_start) => //;
+      case: (BinInt.Z.compare funding_end (now env)) => //; auto;
+      (try by case);
+      (try by move=> + []).
+    - case => + [].
+      case: (BinInt.Z.compare (now env) funding_start) => //;
+      case: (BinInt.Z.compare funding_end (now env)) => //; auto;
+      (try by case);
+      (try by move=> + []).
+Qed.
+
+Lemma crowdfunding_correct_withdraw
+      (env : @proto_env (Some (parameter_ty, None)))
+      (fuel : Datatypes.nat)
+      (beneficiary : data address)
+      (raisers : data (set address))
+      (refund_table : data (big_map address mutez))
+      (funding_start : data timestamp)
+      (funding_end : data timestamp)
+      (unconditional_refund_start : data timestamp)
+      (withdrawn : data bool)
+      (psi : stack (pair (list operation) storage_ty ::: [::]) -> Prop) :
+fuel > 7 ->
+precond (eval_seq env crowdfunding fuel
+         (inr (inl beneficiary),
+          ((raisers, refund_table),
+           ((withdrawn, funding_start),
+            (funding_end, unconditional_refund_start))), tt)) psi <->
+geq (now env) funding_start /\ geq funding_end (now env)
+/\ gt unconditional_refund_start (now env)
+/\ withdrawn = false
+/\ set.mem address_constant address_compare (source env) raisers
+/\ exists y, contract_ None unit beneficiary = Some y
+   /\ psi ([:: transfer_tokens env unit tt (balance env) y],
+          (raisers, refund_table,
+          (true, funding_start, (funding_end, unconditional_refund_start))), tt).
+Proof.
+  move=> F; have<-: 8 + (fuel - 8) = fuel by rewrite addnC subnK.
+  rewrite eval_seq_precond_correct /eval_seq_precond /=.
+  rewrite /gt /geq; split.
+  + case => + [] + [].
+    case: (BinInt.Z.compare (now env) funding_start) => //;
+    case: (BinInt.Z.compare funding_end (now env)) => //;
+    by (rewrite /= BinInt.Z.compare_antisym;
+    case: (BinInt.Z.compare (now env) unconditional_refund_start) => // + + a *;
+    repeat split => //; auto; by move/negP/negP: a).
+  + case=> + [] + [] + [] + [].
+    case: (BinInt.Z.compare (now env) funding_start) => //;
+    case: (BinInt.Z.compare funding_end (now env)) => //;
+    case=> [] // ? [] // ? -> ? a *;
+    repeat split => //; auto; by apply/negP/negP.
+Qed.
+
+Lemma crowdfunding_correct_refund
+      (env : @proto_env (Some (parameter_ty, None)))
+      (fuel : Datatypes.nat)
+      (eligible_address : data address)
+      (raisers : data (set address))
+      (refund_table : data (big_map address mutez))
+      (funding_start : data timestamp)
+      (funding_end : data timestamp)
+      (unconditional_refund_start : data timestamp)
+      (withdrawn : data bool)
+      (psi : stack (pair (list operation) storage_ty ::: [::]) -> Prop) :
+let remove := map.remove address_constant tez.mutez address_compare
+              (compare_eq_iff address) (lt_trans address) (gt_trans address) in
+let get := map.get address_constant tez.mutez address_compare in
+fuel > 7 ->
+precond (eval_seq env crowdfunding fuel
+         (inr (inr eligible_address),
+          ((raisers, refund_table),
+           ((withdrawn, funding_start),
+            (funding_end, unconditional_refund_start))), tt)) psi <->
+exists y, get eligible_address refund_table = Some y
+/\ geq unconditional_refund_start (now env)
+/\ withdrawn = false
+/\ (exists y0, contract_ None unit eligible_address = Some y0
+   /\ psi ([:: transfer_tokens env unit tt y y0],
+           (raisers, remove eligible_address refund_table,
+           (true, funding_start, (funding_end, unconditional_refund_start))), tt)).
+Proof.
+  move=> rm get F; have<-: 8 + (fuel - 8) = fuel by rewrite addnC subnK.
+  rewrite eval_seq_precond_correct /eval_seq_precond /=.
+  subst rm get; rewrite /gt /geq; split.
+  + case=> y [] H1 [] H2 [] H3 H4; exists y.
+    repeat split; auto.
+    by case: H2; case: (BinInt.Z.compare unconditional_refund_start (now env)); auto.
+  + case=> y [] H1 [] H2 [] H3 H4; exists y.
+    repeat split; auto.
+    by case: H2; case: (BinInt.Z.compare unconditional_refund_start (now env)); auto.
+Qed.
 End crowdfunding.
