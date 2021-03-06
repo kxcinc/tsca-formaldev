@@ -102,7 +102,7 @@ Definition validate_refund {self_type S} :
   instruction_seq self_type false
                   (storage_ty ::: S)
                   (storage_ty ::: S) :=
-{NOW; DIP1 unconditional_refund_start; SWAP; COMPARE; LT};;;
+{NOW; DIP1 unconditional_refund_start; SWAP; COMPARE; GT};;;
  IF_TRUE {FAILWITH} { };; withdrawn;;; {IF_TRUE {FAILWITH} { }}.
 
 Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
@@ -137,7 +137,7 @@ Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
       DIP1 {SWAP};;
       SWAP;;
       create_transfer;;;
-      {NIL operation; SWAP; CONS; DIP1 set_withdrawn; PAIR})}}}.
+      {NIL operation; SWAP; CONS; PAIR})}}}.
 
 Local Definition geq a b :=
   BinInt.Z.compare a b = Gt \/ BinInt.Z.compare a b = Eq.
@@ -172,7 +172,7 @@ precond (eval_seq env crowdfunding fuel
 let changed_refund_table :=
 match refund_amount refund_address refund_table with
 | Some x =>
-  let! z := (tez.of_Z (BinInt.Z.add (tez.to_Z (amount env)) (tez.to_Z x))) in
+  let! z := tez.of_Z (BinInt.Z.add (tez.to_Z (amount env)) (tez.to_Z x)) in
   Return (insert z refund_table)
 | None =>
   Return (insert (amount env) refund_table)
@@ -275,21 +275,23 @@ precond (eval_seq env crowdfunding fuel
            ((withdrawn, funding_start),
             (funding_end, unconditional_refund_start))), tt)) psi <->
 exists y, get eligible_address refund_table = Some y
-/\ geq unconditional_refund_start (now env)
+/\ geq (now env) unconditional_refund_start
 /\ withdrawn = false
 /\ (exists y0, contract_ None unit eligible_address = Some y0
    /\ psi ([:: transfer_tokens env unit tt y y0],
            (raisers, remove eligible_address refund_table,
-           (true, funding_start, (funding_end, unconditional_refund_start))), tt)).
+           (withdrawn, funding_start, (funding_end, unconditional_refund_start))), tt)).
 Proof.
   move=> rm get F; have<-: 8 + (fuel - 8) = fuel by rewrite addnC subnK.
   rewrite eval_seq_precond_correct /eval_seq_precond /=.
   subst rm get; rewrite /gt /geq; split.
   + case=> y [] H1 [] H2 [] H3 H4; exists y.
     repeat split; auto.
+    rewrite /= BinInt.Z.compare_antisym.
     by case: H2; case: (BinInt.Z.compare unconditional_refund_start (now env)); auto.
   + case=> y [] H1 [] H2 [] H3 H4; exists y.
     repeat split; auto.
-    by case: H2; case: (BinInt.Z.compare unconditional_refund_start (now env)); auto.
+    rewrite /= BinInt.Z.compare_antisym.
+    by case: H2; case: (BinInt.Z.compare (now env) unconditional_refund_start); auto.
 Qed.
 End crowdfunding.
