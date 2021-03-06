@@ -1,5 +1,6 @@
 -R ../tsca-formaldev tscaformaldev
 ./util.v
+./ccgen_util.v
 ./ccgen.v
 ./fundme.v
 ./wrapper.v

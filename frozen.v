@@ -1,6 +1,7 @@
 From mathcomp Require Import all_ssreflect.
 From Michocoq Require Import semantics util macros.
 Import syntax comparable error.
+Require Import ccgen_util.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -156,4 +157,7 @@ Proof.
   move=> f5; rewrite return_precond frozen_correct //=.
   by case: (contract_ (Some "") unit addr) => // ? [][] + ->.
 Qed.
+
+Definition frozen_genprog_validation_snippet :=
+  @make_typed_validation_snippet (pair (set address) timestamp) { DROP1; DROP1 }.
 End frozen.

@@ -112,25 +112,29 @@ with reconstr1 {self_type a b tff} (ins: instruction self_type tff a b) :
 Open Scope michelson_scope.
 
 Definition genprog {parameter_ty storage_ty}
-           (prog: full_contract false parameter_ty None storage_ty) :
-  Datatypes.option (instruction_seq None false (pair bytes mutez ::: [::])
+           (prog: full_contract false parameter_ty None storage_ty)
+           (validation_snippet: instruction_seq None false
+                                                (pair bytes mutez ::: [::])
+                                                (pair bytes mutez ::: [::]))
+  : Datatypes.option (instruction_seq None false (pair bytes mutez ::: [::])
     (list (pair (pair syntax_type.string (lambda (pair bytes bytes)
     (pair (list operation) bytes))) (pair bytes mutez)) ::: [::])) :=
   match reconstr prog with
   | Some prog0 =>
-    Some {DIP1 {NIL _};
+    Some (validation_snippet;;;
+         {DIP1 {NIL _};
          LAMBDA _ _
                 {
                   UNPAIR; UNPACK parameter_ty;
                   IF_NONE {PUSH _ (Comparable_constant syntax_type.string "unpack param"); FAILWITH}
                           {
                             SWAP; UNPACK storage_ty;
-                            IF_NONE {PUSH _ (Comparable_constant syntax_type.string "unpack storage") ; FAILWITH}
+                            IF_NONE {PUSH _ (Comparable_constant syntax_type.string "unpack storage"); FAILWITH}
                                     (SWAP;; PAIR;; prog0;;;
                                      {UNPAIR; DIP1 {PACK}; PAIR})
                           }
                 };
-         PUSH _ (Comparable_constant syntax_type.string "main"); PAIR; PAIR; CONS}
+         PUSH _ (Comparable_constant syntax_type.string "main"); PAIR; PAIR; CONS})
   | None => None
   end.
 
