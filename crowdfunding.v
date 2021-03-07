@@ -14,8 +14,8 @@ Open Scope string_scope.
 Open Scope michelson_scope.
 
 Definition parameter_ty :=
-  or key_hash (Some "refund_address")
-     (or address (Some "beneficiary") address (Some "eligible_address")) None.
+  or key_hash None
+     (or address None address None) None.
 
 Definition storage_ty :=
   (pair
