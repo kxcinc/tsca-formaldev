@@ -1,6 +1,7 @@
 From mathcomp Require Import all_ssreflect.
 From Michocoq Require Import semantics util macros.
 Import syntax comparable error.
+Require Import ccgen_util.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -294,4 +295,69 @@ Proof.
     rewrite /= BinInt.Z.compare_antisym.
     by case: H2; case: (BinInt.Z.compare (now env) unconditional_refund_start); auto.
 Qed.
+
+(* 90 days = (60*60*24*90) seconds *)
+Definition funding_start_latest :=
+  Comparable_constant _ (BinInt.Z_of_nat [Num of 7776000]
+                         : simple_comparable_data int).
+
+(* 270 days = (60*60*24*270) seconds *)
+Definition funding_period_longest :=
+  Comparable_constant _ (BinInt.Z_of_nat [Num of 23328000]
+                         : simple_comparable_data int).
+
+(* 90 days = (60*60*24*90) seconds *)
+Definition redeem_period_longest :=
+  Comparable_constant _ (BinInt.Z_of_nat [Num of 7776000]
+                         : simple_comparable_data int).
+
+Definition validation_snippet :
+    instruction_seq None false (storage_ty ::: mutez ::: [::]) [::].
+  apply: (DIP1 {DROP1};; _).
+  apply: (raisers;;; _).
+  apply: (@SIZE _ _ (size_set _) _;; _).
+  apply: (PUSH _ (Comparable_constant _ (BinNums.N0 : simple_comparable_data nat));; _).
+  apply: (COMPARE;; _).
+  apply: (EQ;; _).
+  apply: (IF_TRUE {PUSH _ (Comparable_constant syntax_type.string "there must be at least one registered raiser");
+                  FAILWITH}
+                 {};; _).
+  apply: (funding_start;;; _).
+  apply: (DIP1 {NOW};; _).
+  apply: (COMPARE;; _).
+  apply: (LT;; _).
+  apply: (DIP1 funding_end;; _).
+  apply: (DIIP funding_start;; _).
+  apply: (DIP1 {COMPARE; LT};; _).
+  apply: (@OR _ _ bitwise_bool _;; _).
+  apply: (DIP1 unconditional_refund_start;; _).
+  apply: (DIIP funding_end;; _).
+  apply: (DIP1 {COMPARE; LT};; _).
+  apply: (@OR _ _ bitwise_bool _;; _).
+  apply: (IF_TRUE {PUSH _ (Comparable_constant syntax_type.string "timestamp parameters given in wrong order");
+                  FAILWITH}
+                 {};; _).
+  apply: (funding_start;;; NOW;; SWAP;; @SUB _ _ _ sub_timestamp_timestamp _;; _).
+  apply: (PUSH _ funding_start_latest;; SWAP;; _).
+  apply: (COMPARE;; GT;; _).
+  apply: (IF_TRUE {PUSH _ (Comparable_constant syntax_type.string "funding_start too late");
+                  FAILWITH}
+                 {};; _).
+  apply: (funding_end;;; DIP1 funding_start;; @SUB _ _ _ sub_timestamp_timestamp _;; _).
+  apply: (PUSH _ funding_period_longest;; SWAP;; _).
+  apply: (COMPARE;; GT;; _).
+  apply: (IF_TRUE {PUSH _ (Comparable_constant syntax_type.string "funding period too long");
+                  FAILWITH}
+                 {};; _).
+  apply: (unconditional_refund_start;;; DIP1 funding_end;; @SUB _ _ _ sub_timestamp_timestamp _;; _).
+  apply: (PUSH _ redeem_period_longest;; SWAP;; _).
+  apply: (COMPARE;; GT;; _).
+  apply: (IF_TRUE {PUSH _ (Comparable_constant syntax_type.string "redeem period too long");
+                  FAILWITH}
+                 {};; _).
+  apply ({DROP1 }).
+Defined.
+
+Definition crowdfunding_genprog_validation_snippet :=
+  make_typed_validation_snippet validation_snippet.
 End crowdfunding.
