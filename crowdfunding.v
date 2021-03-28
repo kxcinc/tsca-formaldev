@@ -438,6 +438,10 @@ Hypothesis new_env :
   forall {N : self_info},
     @proto_env N -> data (list operation) -> @proto_env N.
 
+Hypothesis now_gt :
+  forall N env ops,
+    geq (now (@new_env N env ops)) (now env).
+
 Section Composition.
 Definition comp {tffB T U}
            (N : self_info)
@@ -466,7 +470,8 @@ Inductive Operation :=
 | TransferTokens : forall
     (env : @proto_env (Some (parameter_ty, None)))
     (m : tez.mutez)
-    (d : data (contract unit)), Operation.
+    (d : data (contract unit))
+    (da : data address), Operation.
 
 Definition eval_seq_another
       (env : @proto_env (Some (parameter_ty, None)))
@@ -487,7 +492,7 @@ Definition eval_seq_another
       match contract_ None unit eligible_address with
       | Some y0 =>
         if (7 < fuel) && geq (now env) unconditional_refund_start && (withdrawn == false)
-        then Return ([:: TransferTokens env y y0],
+        then Return ([:: TransferTokens env y y0 eligible_address],
                 (raisers, remove eligible_address refund_table,
                  (withdrawn, funding_start, (funding_end, unconditional_refund_start))), tt)
         else Failed _ Overflow
@@ -503,7 +508,7 @@ Definition eval_seq_another
          && gt unconditional_refund_start (now env)
          && (set.mem address_constant address_compare (source env) raisers)
          && (withdrawn == false)
-      then Return ([:: TransferTokens env (balance env) y],
+      then Return ([:: TransferTokens env (balance env) y beneficiary],
           (raisers, refund_table,
           (true, funding_start, (funding_end, unconditional_refund_start))), tt)
       else Failed _ Overflow
@@ -530,13 +535,13 @@ Definition eval_seq_another
 
 Local Definition conv (o : Operation) :=
   match o with
-  | TransferTokens env m d =>
+  | TransferTokens env m d _ =>
     transfer_tokens env unit tt m d
   end.
 
 Local Definition destination (o : Operation) :=
   match o with
-  | TransferTokens env m d => d
+  | TransferTokens env m d da => da
   end.
 
 Lemma eval_seq_eq env fuel A :
@@ -780,11 +785,125 @@ Canonical operation_constant_eqMixin := EqMixin operation_constant_eqP.
 Canonical operation_constant_eqType :=
   Eval hnf in EqType (data operation) operation_constant_eqMixin.
 
+Lemma size_crowdfunding_operations env x y z a b:
+  eval_seq_another env x (y, z, tt) = Return (a, b, tt) ->
+  seq.size a <= 1.
+Proof.
+  rewrite /eval_seq_another.
+  case: y => [refund_address|[beneficiary|eligible_address]] /=.
+  + case: z => [] [] ? ? [] [] ? ? [] ? ?.
+    case: (match _ with | Some _ => _ | None => _ end) => //= ?.
+    by case: ifP => // ? [] <-.
+  + case: z => [] [] ? ? [] [] ? ? [] ? ?.
+    case: (contract_ None unit beneficiary) => // ?.
+    by case: ifP => // ? [] <-.
+  + case: z => [] [] ? ? [] [] ? ? [] ? ?.
+    case: (map.get address_constant tez.mutez address_compare eligible_address _) => // ?.
+    case: (contract_ None unit _) => // ?.
+    by case: ifP => // ? [] <-.
+Qed.
+
+Lemma compN_withdraw xs env storage :
+  (compN_another xs env storage).2.1.2.2.1.1 = true ->
+  seq.size (compN_another xs env storage).2.1.1 <= 1.
+Proof.
+  elim: xs storage env => // x xs IH storage env.
+  move: IH.
+  rewrite /= /comp_another.
+  case eq: (compN_another xs env storage) => [b0 b1].
+  case: b1 eq => [][]a b [] eq.
+  rewrite /= -eq.
+  case: x => [][|[]]? b1 IH.
+  + rewrite /eval_seq_another /=.
+    case: b eq => [][] raisers refund_table [][] withdrawn funding_start
+              [] funding_end unconditional_refund_start /= eq.
+    case: (map.get address_constant tez.mutez address_compare _ _) => /=.
+      move=> ?.
+      case: (tez.of_Z _) => [?|? /=].
+       by apply/IH.
+      case: ifP => ?.
+      rewrite /= cats0.
+      move: (IH storage env).
+      by rewrite !eq.
+     by apply/IH.
+    case: ifP => ?.
+     rewrite /= cats0.
+     move: (IH storage env).
+     by rewrite !eq /=.
+    by apply/IH.
+  + rewrite /eval_seq_another /=.
+    case: b eq => [][] raisers refund_table [][] withdrawn funding_start
+              [] funding_end unconditional_refund_start /= eq.
+    case: (contract_ None unit _) => ? /=.
+     case: ifP .
+     rewrite /=.
+
+
+    rewrite /=.
+
+
+    rewrite /=.
+
+      apply/IH.
+  rewrite /=.
+
 Lemma refund_refund
       (xs : seq (data parameter_ty * Datatypes.nat))
-      storage :
-let '(env, (ops, storage, tt)) := compN_another env xs storage in
-@uniq [eqType of data operation] (seq.map (transfer_tokens_proj3_morph transfer_tokens_proj3) res.1).
+      env storage :
+let '(env, (ops, storage, tt)) := compN_another xs env storage in
+@uniq [eqType of data address] (seq.map destination ops).
+Proof.
+  suff: @uniq [eqType of data address] (seq.map destination (compN_another xs env storage).2.1.1)
+  by case: (compN_another xs env storage) => [] env0 [][] ?? [].
+  elim: xs env storage => //= x xs IH env storage.
+  case compN_eq: (compN_another xs env storage) => [env0 [][] ops st []].
+  rewrite /comp_another /=.
+  case eq: (eval_seq_another env0 x.2 (x.1, st, tt)) => [/=|[] a []].
+   have<-: (compN_another xs env storage).2.1.1 = ops by rewrite compN_eq.
+   by apply/IH.
+  case: a eq => [] opsB st0 /= H.
+  rewrite map_cat uniq_catC cat_uniq.
+  have<-: (compN_another xs env storage).2.1.1 = ops by rewrite compN_eq.
+  rewrite IH andbT.
+  case: x H => [][refund_address|[beneficiary|eligible_address]] fuel;
+  rewrite /eval_seq_another /=.
+  + case: st compN_eq => [][] raisers refund_table [][] withdrawn funding_start
+              [] funding_end unconditional_refund_start compN_eq.
+    case: (map.get address_constant tez.mutez address_compare (Implicit refund_address) refund_table) => [?|/=].
+     case: (tez.of_Z _) => //= ?.
+     case: ifP => // ? [] <- ? /=.
+     by elim: [seq destination i | i <- _].
+    case: ifP => // ? [] <- ? /=.
+    by elim: [seq destination i | i <- _].
+  + case: st compN_eq => [][] raisers refund_table [][] withdrawn funding_start
+              [] funding_end unconditional_refund_start compN_eq.
+    case: (contract_ None unit beneficiary) => // ?.
+    case: ifP => // C [] <- ? /=.
+    suff->: (compN_another xs env storage).2.1.1 = [::] by [].
+    have: (compN_another xs env storage).2.1.2.2.1.1 = false.
+     rewrite compN_eq /=; case: C.
+     by case/andP => ? /eqP.
+    elim: xs {IH compN_eq} => //= x xs IH.
+    rewrite /comp_another /=.
+    (compN_another xs env storage).2.1.1
+    beneficiary;
+    eligible_address; eligible_address; ...
+
+  move: H.
+  rewrite /=.
+
+
+   have:te /=.
+  case eq: (eval_seq_another (compN_another xs env storage).1 x.2 (x.1, storage0, tt)) => //.
+  rewrite /=.
+  move eq: (compN _ _ _ _) => A.
+  case: A eq => [][] /= res storage' []/= eqA IH.
+  rewrite /comp.
+  move eq: (eval_seq env crowdfunding x.2 (x.1, storage', tt)) => B.
+  case: B eq => // [] a.
+  rewrite return_precond eval_seq_precond_correct -eval_seq_precond_correct.
+  case: storage' eqA => [][] raisers refund_table [][] withdrawn funding_start
+                     [] funding_end unconditional_refund_start eqA.
 
 Definition collect_eligible_address (xs : seq (data parameter_ty * Datatypes.nat))
   := undup (foldl cat [::] (seq.map (fun x => match x.1 with
