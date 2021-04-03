@@ -466,12 +466,12 @@ Definition compN {tff T U N}
   foldr (fun b a => comp a.1 a.2 b.1 b.2 I) (env, ([::], storage, tt)) xs.
 End Composition.
 
-Inductive Operation :=
+Inductive operation' :=
 | TransferTokens : forall
     (env : @proto_env (Some (parameter_ty, None)))
     (m : tez.mutez)
     (d : data (contract unit))
-    (da : data address), Operation.
+    (da : data address), operation'.
 
 Definition eval_seq_another
       (env : @proto_env (Some (parameter_ty, None)))
@@ -533,13 +533,13 @@ Definition eval_seq_another
     else Failed _ Overflow
   end.
 
-Local Definition conv (o : Operation) :=
+Local Definition conv (o : operation') :=
   match o with
   | TransferTokens env m d _ =>
     transfer_tokens env unit tt m d
   end.
 
-Local Definition destination (o : Operation) :=
+Local Definition destination (o : operation') :=
   match o with
   | TransferTokens env m d da => da
   end.
@@ -696,15 +696,14 @@ Qed.
 
 Definition comp_another
            (env : @proto_env (Some (parameter_ty, None)))
-           (A : seq Operation * data storage_ty * Datatypes.unit)
+           (A : seq operation' * data storage_ty * Datatypes.unit)
            (paramB : data parameter_ty)
            fuelB :=
-  let '(opsA, storage, tt) := A in
-  match eval_seq_another env fuelB (paramB, storage, tt) with
+  match eval_seq_another env fuelB (paramB, A.1.2, tt) with
   | Return (opsB, storage, tt) =>
-    (new_env env (seq.map conv opsB), (cat opsA opsB, storage, tt))
+    (new_env env (seq.map conv opsB), (cat A.1.1 opsB, storage, tt))
   | Failed _ =>
-    (env, (opsA, storage, tt))
+    (env, (A.1.1, A.1.2, tt))
   end.
 
 Definition compN_another xs env storage :=
@@ -739,12 +738,12 @@ Proof.
   rewrite /= !IH //=.
   case: (compN_another xs env storage) => [] env0 [][] ops st [].
   case s: (success (eval_seq env0 crowdfunding x.2 (x.1, st, tt))).
-  + rewrite /= eval_seq_eq //.
-    case: (eval_seq_another env0 x.2 (x.1, st, tt)) => [//|] [][]? ? [].
+  + rewrite /= eval_seq_eq // /comp_another.
+    case: (eval_seq_another env0 x.2 (x.1, st, tt)) s => [//|] [][]? ? [].
     by rewrite map_cat.
   + have: ~~ success (eval_seq_another env0 x.2 (x.1, st, tt))
      by rewrite -eval_seq_fail s.
-    move: s => /=.
+    move: s => /=; rewrite /comp_another.
     case: (eval_seq env0 crowdfunding x.2 (x.1, st, tt)) => //.
     by case: (eval_seq_another env0 x.2 (x.1, st, tt)).
 Qed.
@@ -803,49 +802,123 @@ Proof.
     by case: ifP => // ? [] <-.
 Qed.
 
-Lemma compN_withdraw xs env storage :
-  (compN_another xs env storage).2.1.2.2.1.1 = true ->
-  seq.size (compN_another xs env storage).2.1.1 <= 1.
+(* Inductive ops_spec xs env storage : seq operation' -> Type := *)
+(* | OpsSpecContribute of (compN_another xs env storage).2.1.1 = [::] *)
+(*   : ops_spec xs env storage [::]. *)
+(* | OpsSpec of (compN_another xs env storage).2.1.1 = [::] *)
+(*   : ops_spec xs env storage [::]. *)
+
+
+(* Lemma temp xs env storage : *)
+
+Local Lemma gt_geq_trans' a b c :
+  gt a b -> geq b c -> gt a c.
 Proof.
-  elim: xs storage env => // x xs IH storage env.
-  move: IH.
-  rewrite /= /comp_another.
-  case eq: (compN_another xs env storage) => [b0 b1].
-  case: b1 eq => [][]a b [] eq.
-  rewrite /= -eq.
-  case: x => [][|[]]? b1 IH.
-  + rewrite /eval_seq_another /=.
-    case: b eq => [][] raisers refund_table [][] withdrawn funding_start
-              [] funding_end unconditional_refund_start /= eq.
-    case: (map.get address_constant tez.mutez address_compare _ _) => /=.
-      move=> ?.
-      case: (tez.of_Z _) => [?|? /=].
-       by apply/IH.
-      case: ifP => ?.
-      rewrite /= cats0.
-      move: (IH storage env).
-      by rewrite !eq.
-     by apply/IH.
-    case: ifP => ?.
-     rewrite /= cats0.
-     move: (IH storage env).
-     by rewrite !eq /=.
-    by apply/IH.
-  + rewrite /eval_seq_another /=.
-    case: b eq => [][] raisers refund_table [][] withdrawn funding_start
-              [] funding_end unconditional_refund_start /= eq.
-    case: (contract_ None unit _) => ? /=.
-     case: ifP .
-     rewrite /=.
+move=> ab bc.
+rewrite /gt.
+case eq: (BinInt.Z.compare a c) => //.
++ move: eq.
+  rewrite BinInt.Z.compare_eq_iff => bceq.
+  rewrite {}bceq in ab, bc.
+  move: ab bc.
+  rewrite /gt /geq BinInt.Z.compare_antisym.
+  by case: (BinInt.Z.compare b c).
++ move: ab bc.
+  rewrite /gt /geq BinInt.Z.compare_antisym.
+  case eqab: (BinInt.Z.compare b a) => //.
+  rewrite BinInt.Z.compare_antisym.
+  case eqac: (BinInt.Z.compare c b) => //.
+  - move: eqac.
+    rewrite BinInt.Z.compare_eq_iff => eqcb.
+    rewrite eqcb in eq.
+    move: eq eqab.
+    rewrite BinInt.Z.compare_antisym.
+    by case: (BinInt.Z.compare b a).
+  - move: eq eqab eqac.
+    rewrite !BinInt.Z.compare_lt_iff => bc ab.
+    move: (BinInt.Z.lt_trans _ _ _ ab bc).
+    rewrite -!BinInt.Z.compare_lt_iff BinInt.Z.compare_antisym.
+    by case: (BinInt.Z.compare c b).
+Qed.
+
+(* Lemma compN_unconditional_refund_start xs env storage : *)
+(*   gt storage.2.2.2 (now (compN_another xs env storage).1) -> *)
+(*   (compN_another xs env storage).2.1.1 = [::]. *)
+(* Proof. *)
+(*   elim: xs env storage => // x xs IH env storage. *)
+(*   rewrite /= /comp_another /=. *)
+(*   case: x => [][refund_address|[beneficiary|eligible_address]] fuel; *)
+(*   rewrite /eval_seq_another /=. *)
+(*   + case eq : (compN_another xs env storage).2.1.2 => *)
+(*     [[]raisers refund_table *)
+(*      [][]withdrawn funding_start [] *)
+(*      funding_end unconditional_refund_start]. *)
+(*     case: (map.get address_constant tez.mutez address_compare _ _) => /= [z|]. *)
+(*      case: (tez.of_Z _) => [e|a]/=. *)
+(*       by apply/IH. *)
+(*      case: ifP => ? /= H; last by apply/IH. *)
+(*      rewrite /= cats0 IH //. *)
+(*      by apply/(gt_geq_trans' H)/now_gt. *)
+(*     case: ifP => ? /= H; last by apply/IH. *)
+(*     rewrite /= cats0 IH //. *)
+(*     by apply/(gt_geq_trans' H)/now_gt. *)
+(*   + case eq : (compN_another xs env storage).2.1.2 => *)
+(*     [[]raisers refund_table *)
+(*      [][]withdrawn funding_start [] *)
+(*      funding_end unconditional_refund_start]. *)
+(*     case: (contract_ None unit beneficiary) => [a|]; last by apply/IH. *)
+(*     case: ifP => /= H0 H; last by apply/IH. *)
+(*     have: gt storage.2.2.2 (now (compN_another xs env storage).1) *)
+(*      by apply/(gt_geq_trans' H)/now_gt. *)
+(*     rewrite IH. *)
+(*    by apply/IH. *)
+(*   case=> [][]A B [] H. *)
+(*   rewrite /= IH. *)
+
+(* Lemma compN_withdraw xs env storage : *)
+(*   (compN_another xs env storage).2.1.2.2.1.1 = true -> *)
+(*   seq.size (compN_another xs env storage).2.1.1 <= 1. *)
+(* Proof. *)
+(*   elim: xs storage env => // x xs IH storage env. *)
+(*   move: IH. *)
+(*   rewrite /= /comp_another. *)
+(*   case eq: (compN_another xs env storage) => [b0 b1]. *)
+(*   case: b1 eq => [][]a b [] eq. *)
+(*   rewrite /= -eq. *)
+(*   case: x => [][|[]]? b1 IH. *)
+(*   + rewrite /eval_seq_another /=. *)
+(*     case: b eq => [][] raisers refund_table [][] withdrawn funding_start *)
+(*               [] funding_end unconditional_refund_start /= eq. *)
+(*     case: (map.get address_constant tez.mutez address_compare _ _) => /=. *)
+(*       move=> ?. *)
+(*       case: (tez.of_Z _) => [?|? /=]. *)
+(*        by apply/IH. *)
+(*       case: ifP => ?. *)
+(*       rewrite /= cats0. *)
+(*       move: (IH storage env). *)
+(*       by rewrite !eq. *)
+(*      by apply/IH. *)
+(*     case: ifP => ?. *)
+(*      rewrite /= cats0. *)
+(*      move: (IH storage env). *)
+(*      by rewrite !eq /=. *)
+(*     by apply/IH. *)
+(*   + rewrite /eval_seq_another /=. *)
+(*     case: b eq => [][] raisers refund_table [][] withdrawn funding_start *)
+(*               [] funding_end unconditional_refund_start /= eq. *)
+(*     case: (contract_ None unit _) => ? /=. *)
+(*      case: ifP . *)
+(*      gt unconditional_refund_start (now (compN_another xs env storage).1) *)
+(*      rewrite /=. *)
 
 
-    rewrite /=.
+(*     rewrite /=. *)
 
 
-    rewrite /=.
+(*     rewrite /=. *)
 
-      apply/IH.
-  rewrite /=.
+(*       apply/IH. *)
+(*   rewrite /=. *)
 
 Lemma refund_refund
       (xs : seq (data parameter_ty * Datatypes.nat))
@@ -854,37 +927,50 @@ let '(env, (ops, storage, tt)) := compN_another xs env storage in
 @uniq [eqType of data address] (seq.map destination ops).
 Proof.
   suff: @uniq [eqType of data address] (seq.map destination (compN_another xs env storage).2.1.1)
-  by case: (compN_another xs env storage) => [] env0 [][] ?? [].
+   by case: (compN_another xs env storage) => [] env0 [][] ?? [].
   elim: xs env storage => //= x xs IH env storage.
-  case compN_eq: (compN_another xs env storage) => [env0 [][] ops st []].
+  case compN_eq': (compN_another xs env storage) => [env0 [][] ops st []].
   rewrite /comp_another /=.
   case eq: (eval_seq_another env0 x.2 (x.1, st, tt)) => [/=|[] a []].
-   have<-: (compN_another xs env storage).2.1.1 = ops by rewrite compN_eq.
+   have<-: (compN_another xs env storage).2.1.1 = ops by rewrite compN_eq'.
    by apply/IH.
   case: a eq => [] opsB st0 /= H.
   rewrite map_cat uniq_catC cat_uniq.
-  have<-: (compN_another xs env storage).2.1.1 = ops by rewrite compN_eq.
+  have<-: (compN_another xs env storage).2.1.1 = ops by rewrite compN_eq'.
   rewrite IH andbT.
   case: x H => [][refund_address|[beneficiary|eligible_address]] fuel;
   rewrite /eval_seq_another /=.
-  + case: st compN_eq => [][] raisers refund_table [][] withdrawn funding_start
-              [] funding_end unconditional_refund_start compN_eq.
+  + case: st compN_eq' => [][] raisers refund_table [][] withdrawn funding_start
+              [] funding_end unconditional_refund_start compN_eq'.
     case: (map.get address_constant tez.mutez address_compare (Implicit refund_address) refund_table) => [?|/=].
      case: (tez.of_Z _) => //= ?.
      case: ifP => // ? [] <- ? /=.
      by elim: [seq destination i | i <- _].
     case: ifP => // ? [] <- ? /=.
     by elim: [seq destination i | i <- _].
-  + case: st compN_eq => [][] raisers refund_table [][] withdrawn funding_start
-              [] funding_end unconditional_refund_start compN_eq.
+  + case: st compN_eq' => [][] raisers refund_table [][] withdrawn funding_start
+              [] funding_end unconditional_refund_start compN_eq'.
     case: (contract_ None unit beneficiary) => // ?.
-    case: ifP => // C [] <- ? /=.
-    suff->: (compN_another xs env storage).2.1.1 = [::] by [].
+    case: ifP => // C [] <- st0_eq /=.
+    case: hasP => // [][] x /=.
+    rewrite in_cons orbF => + /eqP xe.
+    rewrite {}xe => {x}.
+
     have: (compN_another xs env storage).2.1.2.2.1.1 = false.
-     rewrite compN_eq /=; case: C.
+     rewrite compN_eq' /=; case: C.
      by case/andP => ? /eqP.
+    rewrite compN_eq /=.
+
+    rewrite /=.
+    [seq destination i | i <- (compN_another xs env storage).2.1.1]
+    case.
+    move/exists_inP.
+    suff->: (compN_another xs env storage).2.1.1 = [::] by [].
     elim: xs {IH compN_eq} => //= x xs IH.
     rewrite /comp_another /=.
+    case eq: (eval_seq_another (compN_another xs env storage).1 x.2 _) => [//|a].
+    case: a eq => [][] a b [].
+    rewrite /=.
     (compN_another xs env storage).2.1.1
     beneficiary;
     eligible_address; eligible_address; ...
@@ -894,7 +980,6 @@ Proof.
 
 
    have:te /=.
-  case eq: (eval_seq_another (compN_another xs env storage).1 x.2 (x.1, storage0, tt)) => //.
   rewrite /=.
   move eq: (compN _ _ _ _) => A.
   case: A eq => [][] /= res storage' []/= eqA IH.
