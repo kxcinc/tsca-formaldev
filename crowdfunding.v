@@ -19,7 +19,7 @@ Definition parameter_ty :=
 
 Definition storage_ty :=
   (pair
-     (pair (set (* %raisers *) address) (big_map (* %refund_table *) address mutez))
+     (pair (set (* %raisers *) address) (map (* %refund_table *) address mutez))
      (pair (pair (bool (* %withdrawn *)) (timestamp (* %funding_start *)))
            (pair (timestamp (* %funding_end *)) (timestamp (* %unconditional_refund_start *))))).
 
@@ -38,12 +38,12 @@ Definition funding_end {self_type S} :
 Definition refund_table {self_type S} :
   instruction_seq self_type false
                   (storage_ty ::: S)
-                  (big_map address mutez::: storage_ty ::: S) :=
+                  (map address mutez::: storage_ty ::: S) :=
   {DUP; UNPAIR; DIP1 {DROP1}; UNPAIR; DROP1}.
 
 Definition update_refund_table {self_type S} :
   instruction_seq self_type false
-                  (big_map address mutez::: storage_ty ::: S)
+                  (map address mutez::: storage_ty ::: S)
                   (storage_ty ::: S) :=
   {SWAP; UNPAIR; UNPAIR; DIP1 {DROP1; SWAP}; PAIR; PAIR}.
 
@@ -113,18 +113,18 @@ Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
    ADDRESS;;
    DUP;;
    DIIP refund_table;;
-   DIP1 {@GET _ _ _ (get_bigmap address mutez) _};;
+   DIP1 {@GET _ _ _ (get_map address mutez) _};;
    DIP1 {IF_SOME {AMOUNT; @ADD _ _ _ add_tez_tez _} {AMOUNT}};;
    DIP1 {SOME};;
    DIIP refund_table;;
-   @UPDATE _ _ _ _ (update_bigmap address mutez) _;;
+   @UPDATE _ _ _ _ (update_map address mutez) _;;
    DIP1 validate_time;; update_refund_table;;; {NIL operation; PAIR})
  {IF_LEFT
   (DIP1 validate_withdraw;;
   BALANCE;;
   create_transfer;;;
   {NIL operation; SWAP; CONS; DIP1 set_withdrawn; PAIR})
-  {DIP1 refund_table; DUP; DIP1 {@GET _ _ _ (get_bigmap address mutez) _}; SWAP;
+  {DIP1 refund_table; DUP; DIP1 {@GET _ _ _ (get_map address mutez) _}; SWAP;
    IF_NONE {FAILWITH}
      (SWAP;;
       DIP1 {SWAP};;
@@ -132,7 +132,7 @@ Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
       DIIP refund_table;;
       SWAP;;
       DUP;;
-      DIP1 {@UPDATE _ _ _ _ (update_bigmap address mutez) _};;
+      DIP1 {@UPDATE _ _ _ _ (update_map address mutez) _};;
       DIIP validate_refund;;
       DIP1 update_refund_table;;
       DIP1 {SWAP};;
@@ -159,7 +159,7 @@ Lemma crowdfunding_correct_contribute
       (fuel : Datatypes.nat)
       (refund_address : data key_hash)
       (raisers : data (set address))
-      (refund_table : data (big_map address mutez))
+      (refund_table : data (map address mutez))
       (funding_start : data timestamp)
       (funding_end : data timestamp)
       (unconditional_refund_start : data timestamp)
