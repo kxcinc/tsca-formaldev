@@ -1212,7 +1212,7 @@ Proof.
      by rewrite xy compare_refl in eq.
 Qed.
 
-Lemma uniq_eligble_address xs env storage eligible_address :
+Lemma uniq_eligible_address xs env storage eligible_address :
   gt storage.2.2.2 storage.2.2.1 ->
   (compN_another xs env storage).2.1.2.2.1.1 = false ->
   eligible_address \in [seq destination i | i <- (compN_another xs env storage).2.1.1] ->
@@ -1364,7 +1364,6 @@ Proof.
      apply/negP => /negP /negPf.
      rewrite map.get_mem_false => C1.
      by rewrite C1 in H.
-    by move: H4 (uniq_eligble_address H1 H2 C) => ->.
+    by move: H4 (uniq_eligible_address H1 H2 C) => ->.
 Qed.
-
 End crowdfunding.
