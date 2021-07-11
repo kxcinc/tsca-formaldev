@@ -438,7 +438,7 @@ Hypothesis new_env :
   forall {N : self_info},
     @proto_env N -> data (list operation) -> @proto_env N.
 
-Hypothesis now_gt :
+Hypothesis now_geq :
   forall N env ops,
     geq (now (@new_env N env ops)) (now env).
 
@@ -953,11 +953,11 @@ Proof.
       case: ifP => ? /= H1 H2; last
        by apply/IH => //; rewrite eq.
      rewrite IH ?eq //.
-     by apply/(gt_geq_trans' H1)/now_gt.
+     by apply/(gt_geq_trans' H1)/now_geq.
     case: ifP => ? /= H1 H2; last
        by apply/IH => //; rewrite eq.
     rewrite /= cats0 IH ?eq //.
-    by apply/(gt_geq_trans' H1)/now_gt.
+    by apply/(gt_geq_trans' H1)/now_geq.
   + case eq : (compN_another xs env storage).2.1.2 =>
     [[]raisers refund_table
      [][]withdrawn funding_start []
@@ -981,7 +981,7 @@ Proof.
     have->: storage.2.2.2 = unconditional_refund_start
      by rewrite (pres_unconditional_refund_start xs env storage) eq.
     case/andP: H0 => [] /andP[] ? /geq_gt C1 ? C2.
-    by rewrite (gt_geq_trans' C2 (now_gt _ _)) in C1.
+    by rewrite (gt_geq_trans' C2 (now_geq _ _)) in C1.
 Qed.
 
 Lemma mem_insert a b c d e f x y z:
