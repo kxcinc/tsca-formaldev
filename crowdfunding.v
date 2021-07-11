@@ -47,7 +47,7 @@ Definition update_refund_table {self_type S} :
                   (storage_ty ::: S) :=
   {SWAP; UNPAIR; UNPAIR; DIP1 {DROP1; SWAP}; PAIR; PAIR}.
 
-Definition validate_time {self_type S} :
+Definition validate_contribute {self_type S} :
   instruction_seq self_type false
                   (storage_ty ::: S)
                   (storage_ty ::: S) :=
@@ -83,8 +83,8 @@ Definition validate_withdraw {self_type S} :
   instruction_seq self_type false
                   (storage_ty ::: S)
                   (storage_ty ::: S) :=
- funding_start;;; NOW;; COMPARE;; GE;;
- {DIP1 funding_end; DIP1 {NOW; SWAP; COMPARE; GE}; AND; NOT};;;
+ funding_start;;; NOW;; SWAP;; COMPARE;; GE;;
+ {DIP1 funding_end; DIP1 {NOW; COMPARE; GE}; AND; NOT};;;
  DIP1 {NOW; DIP1 unconditional_refund_start; SWAP; COMPARE; LE};;
  @OR _ _ bitwise_bool _;; IF_TRUE {FAILWITH} { };;
  withdrawn;;; IF_TRUE {FAILWITH} { };;
@@ -118,7 +118,7 @@ Definition crowdfunding : full_contract false parameter_ty None storage_ty :=
    DIP1 {SOME};;
    DIIP refund_table;;
    @UPDATE _ _ _ _ (update_map address mutez) _;;
-   DIP1 validate_time;; update_refund_table;;; {NIL operation; PAIR})
+   DIP1 validate_contribute;; update_refund_table;;; {NIL operation; PAIR})
  {IF_LEFT
   (DIP1 validate_withdraw;;
   BALANCE;;
@@ -260,7 +260,7 @@ precond (eval_seq env crowdfunding fuel
           ((raisers, refund_table),
            ((withdrawn, funding_start),
             (funding_end, unconditional_refund_start))), tt)) psi <->
-geq (now env) funding_start /\ geq funding_end (now env)
+geq funding_start (now env) /\ geq (now env) funding_end
 /\ gt unconditional_refund_start (now env)
 /\ withdrawn = false
 /\ set.mem address_constant address_compare (source env) raisers
@@ -273,14 +273,14 @@ Proof.
   rewrite eval_seq_precond_correct /eval_seq_precond /=.
   rewrite /gt /geq; split.
   + case => + [] + [].
-    case: (BinInt.Z.compare (now env) funding_start) => //;
-    case: (BinInt.Z.compare funding_end (now env)) => //;
+    case: (BinInt.Z.compare funding_start (now env)) => //;
+    case: (BinInt.Z.compare (now env) funding_end) => //;
     by (rewrite /= BinInt.Z.compare_antisym;
     case: (BinInt.Z.compare (now env) unconditional_refund_start) => // + + a *;
     repeat split => //; auto; by move/negP/negP: a).
   + case=> + [] + [] + [] + [].
-    case: (BinInt.Z.compare (now env) funding_start) => // _;
-    case: (BinInt.Z.compare funding_end (now env)) => // _;
+    case: (BinInt.Z.compare funding_start (now env)) => // _;
+    case: (BinInt.Z.compare (now env) funding_end) => // _;
     case: (BinInt.Z.compare unconditional_refund_start (now env)) => // _ *;
     repeat split => //; auto; by apply/negP/negP.
 Qed.
@@ -504,7 +504,7 @@ Definition eval_seq_another
     match contract_ None unit beneficiary with
     | None => Failed _ Overflow
     | Some y =>
-      if (7 < fuel) && geq (now env) funding_start && geq funding_end (now env)
+      if (7 < fuel) && geq funding_start (now env) && geq (now env) funding_end
          && gt unconditional_refund_start (now env)
          && (set.mem address_constant address_compare (source env) raisers)
          && (withdrawn == false)
@@ -645,8 +645,8 @@ Proof.
     rewrite /eval_seq_another /=.
     case Ceq: (contract_ _ _ _) => [a|//].
     rewrite f7 /=.
-    case: (geq (now env) funding_start) => //.
-    case: (geq funding_end (now env)) => //.
+    case: (geq funding_start (now env)) => //.
+    case: (geq (now env) funding_end) => //.
     case: (gt unconditional_refund_start (now env)) => //.
     case: (set.mem address_constant address_compare (source env) raisers) => //.
     case: withdrawn => //= _.
